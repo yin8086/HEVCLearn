@@ -247,11 +247,15 @@ static Bool readPlane(Pel* dst, istream& fd, Bool is16bit,
                       UInt width, UInt height,
                       UInt pad_x, UInt pad_y)
 {
+  // 8bit读char,16bit读short，内部存储总是用short
   Int read_len = width * (is16bit ? 2 : 1);
+
   UChar *buf = new UChar[read_len];
   for (Int y = 0; y < height; y++)
   {
+    // 一次读一行
     fd.read(reinterpret_cast<Char*>(buf), read_len);
+
     if (fd.eof() || fd.fail() )
     {
       delete[] buf;
@@ -275,6 +279,7 @@ static Bool readPlane(Pel* dst, istream& fd, Bool is16bit,
 
     for (Int x = width; x < width + pad_x; x++)
     {
+      // 用Width处像素补齐
       dst[x] = dst[width - 1];
     }
     dst += stride;
@@ -283,6 +288,7 @@ static Bool readPlane(Pel* dst, istream& fd, Bool is16bit,
   {
     for (Int x = 0; x < width + pad_x; x++)
     {
+      // 用Height处像素补齐
       dst[x] = (dst - stride)[x];
     }
     dst += stride;
@@ -387,11 +393,12 @@ Bool TVideoIOYuv::read ( TComPicYuv*  pPicYuv, Int aiPad[2] )
     maxvalC = (0xff << (desired_bitdepthC - 8)) -1;
   }
 #endif
-  
+  // 一次读一个luma帧
   if (! readPlane(pPicYuv->getLumaAddr(), m_cHandle, is16bit, iStride, width, height, pad_h, pad_v))
     return false;
   scalePlane(pPicYuv->getLumaAddr(), iStride, width_full, height_full, m_bitDepthShiftY, minvalY, maxvalY);
 
+  // 统统除以2再来读取 Cb, Cr
   iStride >>= 1;
   width_full >>= 1;
   height_full >>= 1;

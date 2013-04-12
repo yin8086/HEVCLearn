@@ -111,7 +111,9 @@ public:
   Int   getWidth    ()     { return  m_iPicWidth;    }
   Int   getHeight   ()     { return  m_iPicHeight;   }
   
+  /// Stride = Width + ( MarginX * 2) 
   Int   getStride   ()     { return (m_iPicWidth     ) + (m_iLumaMarginX  <<1); }
+  /// 所谓的CStride就是类似Stride，但是对应色度一半的宽度
   Int   getCStride  ()     { return (m_iPicWidth >> 1) + (m_iChromaMarginX<<1); }
   
   Int   getLumaMargin   () { return m_iLumaMarginX;  }

@@ -76,36 +76,43 @@ Void TComPicYuv::create( Int iPicWidth, Int iPicHeight, UInt uiMaxCUWidth, UInt 
   m_iCuWidth        = uiMaxCUWidth;
   m_iCuHeight       = uiMaxCUHeight;
 
+  // 行列的CU个数计算
   Int numCuInWidth  = m_iPicWidth  / m_iCuWidth  + (m_iPicWidth  % m_iCuWidth  != 0);
   Int numCuInHeight = m_iPicHeight / m_iCuHeight + (m_iPicHeight % m_iCuHeight != 0);
   
+  // Margin等于 MaxCU + 16
   m_iLumaMarginX    = g_uiMaxCUWidth  + 16; // for 16-byte alignment
   m_iLumaMarginY    = g_uiMaxCUHeight + 16;  // margin for 8-tap filter and infinite padding
   
   m_iChromaMarginX  = m_iLumaMarginX>>1;
   m_iChromaMarginY  = m_iLumaMarginY>>1;
   
+  // Pel即是short，Buffer大小是 (Width + MarginX * 2) * (Height + MarginY * 2)
   m_apiPicBufY      = (Pel*)xMalloc( Pel, ( m_iPicWidth       + (m_iLumaMarginX  <<1)) * ( m_iPicHeight       + (m_iLumaMarginY  <<1)));
   m_apiPicBufU      = (Pel*)xMalloc( Pel, ((m_iPicWidth >> 1) + (m_iChromaMarginX<<1)) * ((m_iPicHeight >> 1) + (m_iChromaMarginY<<1)));
   m_apiPicBufV      = (Pel*)xMalloc( Pel, ((m_iPicWidth >> 1) + (m_iChromaMarginX<<1)) * ((m_iPicHeight >> 1) + (m_iChromaMarginY<<1)));
   
+  // 将指针往前移动 MarginY * Stride + MarginX
   m_piPicOrgY       = m_apiPicBufY + m_iLumaMarginY   * getStride()  + m_iLumaMarginX;
   m_piPicOrgU       = m_apiPicBufU + m_iChromaMarginY * getCStride() + m_iChromaMarginX;
   m_piPicOrgV       = m_apiPicBufV + m_iChromaMarginY * getCStride() + m_iChromaMarginX;
   
   m_bIsBorderExtended = false;
   
+  // CU网格，对应一个二维的CU矩阵
   m_cuOffsetY = new Int[numCuInWidth * numCuInHeight];
   m_cuOffsetC = new Int[numCuInWidth * numCuInHeight];
   for (Int cuRow = 0; cuRow < numCuInHeight; cuRow++)
   {
     for (Int cuCol = 0; cuCol < numCuInWidth; cuCol++)
     {
+      // 实际上每个cuOffset所赋的值即为此CU左上角的图像内数据偏移值
       m_cuOffsetY[cuRow * numCuInWidth + cuCol] = getStride() * cuRow * m_iCuHeight + cuCol * m_iCuWidth;
       m_cuOffsetC[cuRow * numCuInWidth + cuCol] = getCStride() * cuRow * (m_iCuHeight / 2) + cuCol * (m_iCuWidth / 2);
     }
   }
   
+  //BU矩阵，含义未知，赋值类似上面
   m_buOffsetY = new Int[(size_t)1 << (2 * uiMaxCUDepth)];
   m_buOffsetC = new Int[(size_t)1 << (2 * uiMaxCUDepth)];
   for (Int buRow = 0; buRow < (1 << uiMaxCUDepth); buRow++)
