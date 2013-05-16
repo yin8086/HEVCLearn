@@ -165,6 +165,7 @@ Void TEncTop::createWPPCoders(Int iNumSubstreams)
     return; // already generated.
   }
 
+  // SABC编码器等一些列对象
   m_iNumSubstreams         = iNumSubstreams;
   m_pcSbacCoders           = new TEncSbac       [iNumSubstreams];
   m_pcBinCoderCABACs       = new TEncBinCABAC   [iNumSubstreams];
@@ -402,6 +403,7 @@ Void TEncTop::xGetNewPicBuffer ( TComPic*& rpcPic )
 {
   TComSlice::sortPicList(m_cListPic);
   
+  // 大致感觉就是使用ring buffer取匹配的，或者创建新的返回
   if (m_cListPic.size() >= (UInt)(m_iGOPSize + getMaxDecPicBuffering(MAX_TLAYER-1) + 2) )
   {
     TComList<TComPic*>::iterator iterPic  = m_cListPic.begin();

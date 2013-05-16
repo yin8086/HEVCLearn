@@ -220,6 +220,7 @@ Void TComPicSym::xInitTiles()
   Int   i, j;
 
   //initialize each tile of the current picture
+  // 包括Right Bottom处的CU坐标，以及First Cu的地址
   for( uiRowIdx=0; uiRowIdx < m_iNumRowsMinus1+1; uiRowIdx++ )
   {
     for( uiColumnIdx=0; uiColumnIdx < m_iNumColumnsMinus1+1; uiColumnIdx++ )
@@ -249,6 +250,7 @@ Void TComPicSym::xInitTiles()
   }
 
   //initialize the TileIdxMap
+  // 即每一个的CU所在的Tile 序号(Cu的编号是光栅顺序)
   for( i=0; i<m_uiNumCUsInFrame; i++)
   {
     for(j=0; j < m_iNumColumnsMinus1+1; j++)

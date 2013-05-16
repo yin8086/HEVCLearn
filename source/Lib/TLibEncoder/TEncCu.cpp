@@ -230,7 +230,7 @@ Void TEncCu::init( TEncTop* pcEncTop )
  */
 Void TEncCu::compressCU( TComDataCU*& rpcCU )
 {
-  // initialize CU data
+  // initialize CU data，第0层的Best,Tmp CU值进行初始化
   m_ppcBestCU[0]->initCU( rpcCU->getPic(), rpcCU->getAddr() );
   m_ppcTempCU[0]->initCU( rpcCU->getPic(), rpcCU->getAddr() );
 
@@ -366,7 +366,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
 {
   TComPic* pcPic = rpcBestCU->getPic();
 
-  // get Original YUV data from picture
+  // get Original YUV data from picture，层数以及Zorder很重要
   m_ppcOrigYuv[uiDepth]->copyFromPicYuv( pcPic->getPicYuvOrg(), rpcBestCU->getAddr(), rpcBestCU->getZorderIdxInCU() );
 
   // variables for fast encoder decision
@@ -438,13 +438,17 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
 
   // If slice start or slice end is within this cu...
   TComSlice * pcSlice = rpcTempCU->getPic()->getSlice(rpcTempCU->getPic()->getCurrSliceIdx());
+  // Slice开始是否是在CU内
   Bool bSliceStart = pcSlice->getSliceSegmentCurStartCUAddr()>rpcTempCU->getSCUAddr()&&pcSlice->getSliceSegmentCurStartCUAddr()<rpcTempCU->getSCUAddr()+rpcTempCU->getTotalNumPart();
+  // Slice结束是否是在CU内
   Bool bSliceEnd = (pcSlice->getSliceSegmentCurEndCUAddr()>rpcTempCU->getSCUAddr()&&pcSlice->getSliceSegmentCurEndCUAddr()<rpcTempCU->getSCUAddr()+rpcTempCU->getTotalNumPart());
+  // Slice的边界处CU是否是补上来的（非真实宽高)
   Bool bInsidePicture = ( uiRPelX < rpcBestCU->getSlice()->getSPS()->getPicWidthInLumaSamples() ) && ( uiBPelY < rpcBestCU->getSlice()->getSPS()->getPicHeightInLumaSamples() );
   // We need to split, so don't try these modes.
   if(!bSliceEnd && !bSliceStart && bInsidePicture )
   {
-    for (Int iQP=iMinQP; iQP<=iMaxQP; iQP++)
+    // 需要切分
+    for (Int iQP=iMinQP; iQP<=iMaxQP; iQP++) //> 只进行了inter模式的提前处理
     {
       if (isAddLowestQP && (iQP == iMinQP))
       {
@@ -455,7 +459,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
       bTrySplit    = true;
       fRD_Skip    = MAX_DOUBLE;
 
-      rpcTempCU->initEstData( uiDepth, iQP );
+      rpcTempCU->initEstData( uiDepth, iQP ); // 为里面256个4x4CU设置初值
 
       // do inter modes, SKIP and 2Nx2N
       if( rpcBestCU->getSlice()->getSliceType() != I_SLICE )
@@ -519,7 +523,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
     }
 #endif
 
-    if(!earlyDetectionSkipMode)
+    if(!earlyDetectionSkipMode) //> 正式开始进行分析
     {
       for (Int iQP=iMinQP; iQP<=iMaxQP; iQP++)
       {
@@ -527,9 +531,10 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
         {
           iQP = lowestQP;
         }
-        rpcTempCU->initEstData( uiDepth, iQP );
+        rpcTempCU->initEstData( uiDepth, iQP );// 进行估计的初始化，同上面
 
-        // do inter modes, NxN, 2NxN, and Nx2N
+        // do inter modes, NxN, 2NxN, and Nx2N 
+        // 先不管帧间编码
         if( rpcBestCU->getSlice()->getSliceType() != I_SLICE )
         {
           // 2Nx2N, NxN
@@ -689,7 +694,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
             rpcBestCU->getCbf( 0, TEXT_CHROMA_U ) != 0   ||
             rpcBestCU->getCbf( 0, TEXT_CHROMA_V ) != 0     ) // avoid very complex intra if it is unlikely
           {
-            xCheckRDCostIntra( rpcBestCU, rpcTempCU, SIZE_2Nx2N );
+            xCheckRDCostIntra( rpcBestCU, rpcTempCU, SIZE_2Nx2N ); //> 开始进行RD的Cost分析
             rpcTempCU->initEstData( uiDepth, iQP );
             if( uiDepth == g_uiMaxCUDepth - g_uiAddCUDepth )
             {
@@ -1357,6 +1362,7 @@ Void TEncCu::xCheckRDCostIntra( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, 
 {
   UInt uiDepth = rpcTempCU->getDepth( 0 );
   
+  // 仍然是根据层数设置一些初始参数
   rpcTempCU->setSkipFlagSubParts( false, 0, uiDepth );
 
   rpcTempCU->setPartSizeSubParts( eSize, 0, uiDepth );
@@ -1369,6 +1375,8 @@ Void TEncCu::xCheckRDCostIntra( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, 
   {
     m_pcPredSearch->preestChromaPredMode( rpcTempCU, m_ppcOrigYuv[uiDepth], m_ppcPredYuvTemp[uiDepth] );
   }
+
+  // 核心部分——进行亮度分量的帧内预测
   m_pcPredSearch  ->estIntraPredQT      ( rpcTempCU, m_ppcOrigYuv[uiDepth], m_ppcPredYuvTemp[uiDepth], m_ppcResiYuvTemp[uiDepth], m_ppcRecoYuvTemp[uiDepth], uiPreCalcDistC, bSeparateLumaChroma );
 
   m_ppcRecoYuvTemp[uiDepth]->copyToPicLuma(rpcTempCU->getPic()->getPicYuvRec(), rpcTempCU->getAddr(), rpcTempCU->getZorderIdxInCU() );

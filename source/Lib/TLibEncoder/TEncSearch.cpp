@@ -2440,7 +2440,7 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
   UInt    uiInitTrDepth  = pcCU->getPartitionSize(0) == SIZE_2Nx2N ? 0 : 1;
   UInt    uiWidth        = pcCU->getWidth (0) >> uiInitTrDepth;
   UInt    uiHeight       = pcCU->getHeight(0) >> uiInitTrDepth;
-  UInt    uiQNumParts    = pcCU->getTotalNumPart() >> 2;
+  UInt    uiQNumParts    = pcCU->getTotalNumPart() >> 2; // 256 >> 2 = 64 切4块，每个小块的part数目?
   UInt    uiWidthBit     = pcCU->getIntraSizeIdx(0);
   UInt    uiOverallDistY = 0;
   UInt    uiOverallDistC = 0;
@@ -2459,8 +2459,9 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
   
   //===== loop over partitions =====
   UInt uiPartOffset = 0;
+  // 看来这里是PU的划分
   for( UInt uiPU = 0; uiPU < uiNumPU; uiPU++, uiPartOffset += uiQNumParts )
-  {
+  { //看来uiQNumParts就是为了NxN划分时进行地址递增使用的,2Nx2N时无用
     //===== init pattern for luma prediction =====
     Bool bAboveAvail = false;
     Bool bLeftAvail  = false;

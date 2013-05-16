@@ -359,6 +359,7 @@ Void TComDataCU::initCU( TComPic* pcPic, UInt iCUAddr )
   m_uiTotalBins        = 0;
   m_uiNumPartition     = pcPic->getNumPartInCU();
   
+  // 两个for循环作用不太明白，大概是设置Slice的起始地址，设置的原理不明白
   for(Int i=0; i<pcPic->getNumPartInCU(); i++)
   {
     if(pcPic->getPicSym()->getInverseCUOrderMap(iCUAddr)*pcPic->getNumPartInCU()+i>=getSlice()->getSliceCurStartCUAddr())
@@ -382,8 +383,10 @@ Void TComDataCU::initCU( TComPic* pcPic, UInt iCUAddr )
     }
   }
 
+  //Slice开头并非在CU开头时的内部速印
   Int partStartIdx = getSlice()->getSliceSegmentCurStartCUAddr() - pcPic->getPicSym()->getInverseCUOrderMap(iCUAddr) * pcPic->getNumPartInCU();
 
+  // 初始化参数
   Int numElements = min<Int>( partStartIdx, m_uiNumPartition );
   for ( Int ui = 0; ui < numElements; ui++ )
   {
@@ -418,6 +421,7 @@ Void TComDataCU::initCU( TComPic* pcPic, UInt iCUAddr )
   Int firstElement = max<Int>( partStartIdx, 0 );
   numElements = m_uiNumPartition - firstElement;
   
+  // 初始化参数 part 2
   if ( numElements > 0 )
   {
     memset( m_skipFlag          + firstElement, false,                    numElements * sizeof( *m_skipFlag ) );
@@ -448,6 +452,7 @@ Void TComDataCU::initCU( TComPic* pcPic, UInt iCUAddr )
     memset( m_pbIPCMFlag        + firstElement, false,                    numElements * sizeof( *m_pbIPCMFlag ) );
   }
   
+  // 初始化参数 part 3
   UInt uiTmp = g_uiMaxCUWidth*g_uiMaxCUHeight;
   if ( 0 >= partStartIdx ) 
   {
@@ -495,6 +500,7 @@ Void TComDataCU::initCU( TComPic* pcPic, UInt iCUAddr )
   }
 
   // Setting neighbor CU
+  // 上，左，左上，右上的设置，用于帧内预测
   m_pcCULeft        = NULL;
   m_pcCUAbove       = NULL;
   m_pcCUAboveLeft   = NULL;
@@ -504,6 +510,7 @@ Void TComDataCU::initCU( TComPic* pcPic, UInt iCUAddr )
   m_apcCUColocated[1] = NULL;
 
   UInt uiWidthInCU = pcPic->getFrameWidthInCU();
+  // 四个if进行位置处CU存在检测
   if ( m_uiCUAddr % uiWidthInCU )
   {
     m_pcCULeft = pcPic->getCU( m_uiCUAddr - 1 );
@@ -524,6 +531,7 @@ Void TComDataCU::initCU( TComPic* pcPic, UInt iCUAddr )
     m_pcCUAboveRight = pcPic->getCU( m_uiCUAddr - uiWidthInCU + 1 );
   }
 
+  // 参考列表中的临时并行CU。 作用？
   if ( getSlice()->getNumRefIdx( REF_PIC_LIST_0 ) > 0 )
   {
     m_apcCUColocated[0] = getSlice()->getRefPic( REF_PIC_LIST_0, 0)->getCU( m_uiCUAddr );

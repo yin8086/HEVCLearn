@@ -760,12 +760,12 @@ Void TEncSlice::precompressSlice( TComPic*& rpcPic )
 Void TEncSlice::compressSlice( TComPic*& rpcPic )
 {
   UInt  uiCUAddr;
-  UInt   uiStartCUAddr;
-  UInt   uiBoundingCUAddr;
+  UInt   uiStartCUAddr; //> Slice的起始地址
+  UInt   uiBoundingCUAddr; //> Slice的结束地址
   rpcPic->getSlice(getSliceIdx())->setSliceSegmentBits(0);
   TEncBinCABAC* pppcRDSbacCoder = NULL;
   TComSlice* pcSlice            = rpcPic->getSlice(getSliceIdx());
-  xDetermineStartAndBoundingCUAddr ( uiStartCUAddr, uiBoundingCUAddr, rpcPic, false );
+  xDetermineStartAndBoundingCUAddr ( uiStartCUAddr, uiBoundingCUAddr, rpcPic, false );//> 确定当前Slice的边界
   
   // initialize cost values
   m_uiPicTotalBits  = 0;
@@ -775,6 +775,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
   // set entropy coder
   if( m_pcCfg->getUseSBACRD() )
   {
+    // 熵编码器的一些初始化，这里引用了RD用的SBac
     m_pcSbacCoder->init( m_pcBinCABAC );
     m_pcEntropyCoder->setEntropyCoder   ( m_pcSbacCoder, pcSlice );
     m_pcEntropyCoder->resetEntropy      ();
@@ -796,12 +797,13 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
   // calculate AC/DC values for current picture
   if( pcSlice->getPPS()->getUseWP() || pcSlice->getPPS()->getWPBiPred() )
   {
+    // 未启用
     xCalcACDCParamSlice(pcSlice);
   }
 
   Bool bWp_explicit = (pcSlice->getSliceType()==P_SLICE && pcSlice->getPPS()->getUseWP()) || (pcSlice->getSliceType()==B_SLICE && pcSlice->getPPS()->getWPBiPred());
 
-  if ( bWp_explicit )
+  if ( bWp_explicit ) //> =false
   {
     //------------------------------------------------------------------------------
     //  Weighted Prediction implemented at Slice level. SliceMode=2 is not supported yet.
@@ -829,6 +831,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
     }
   }
 #endif
+  // 去除对象，准备开始
   TEncTop* pcEncTop = (TEncTop*) m_pcCfg;
   TEncSbac**** ppppcRDSbacCoders    = pcEncTop->getRDSbacCoders();
   TComBitCounter* pcBitCounters     = pcEncTop->getBitCounters();
@@ -838,10 +841,10 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
   if( m_pcCfg->getUseSBACRD() )
   {
     iNumSubstreams = pcSlice->getPPS()->getNumSubstreams();
-    uiTilesAcross = rpcPic->getPicSym()->getNumColumnsMinus1()+1;
+    uiTilesAcross = rpcPic->getPicSym()->getNumColumnsMinus1()+1; //> tile穿过几个Tile
     delete[] m_pcBufferSbacCoders;
     delete[] m_pcBufferBinCoderCABACs;
-    m_pcBufferSbacCoders     = new TEncSbac    [uiTilesAcross];
+    m_pcBufferSbacCoders     = new TEncSbac    [uiTilesAcross];//> 根据穿过数分配多个buff 编码器
     m_pcBufferBinCoderCABACs = new TEncBinCABAC[uiTilesAcross];
     for (Int ui = 0; ui < uiTilesAcross; ui++)
     {
@@ -858,7 +861,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
     }
   }
   //if( m_pcCfg->getUseSBACRD() )
-  {
+  { //> 类似上面，lowbuffer，功用未知
     delete[] m_pcBufferLowLatSbacCoders;
     delete[] m_pcBufferLowLatBinCoderCABACs;
     m_pcBufferLowLatSbacCoders     = new TEncSbac    [uiTilesAcross];
@@ -878,8 +881,27 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
   UInt uiTileLCUX     = 0;
   Bool depSliceSegmentsEnabled = pcSlice->getPPS()->getDependentSliceSegmentsEnabledFlag();
   uiCUAddr = rpcPic->getPicSym()->getCUOrderMap( uiStartCUAddr /rpcPic->getNumPartInCU());
+  
+
+#if 0 //> 测试COM，以及ICOM
+  for (int i = 0; i < 256; i++)
+  {
+    std::cout.width(4);
+    std::cout.setf(ios::right);
+    std::cout << rpcPic->getPicSym()->getCUOrderMap(i) << ((((i+1)/16 > 0) && ((i+1)%16 == 0))?"\n":" ");
+  }
+
+  std::cout<<"========================================="<<std::endl;
+  for (int i = 0; i < 256; i++)
+  {
+    std::cout.width(4);
+    std::cout.setf(ios::right);
+    std::cout << rpcPic->getPicSym()->getInverseCUOrderMap(i) << ((((i+1)/16 > 0) && ((i+1)%16 == 0))?"\n":" ");
+  }
+#endif
+
   uiTileStartLCU = rpcPic->getPicSym()->getTComTile(rpcPic->getPicSym()->getTileIdxMap(uiCUAddr))->getFirstCUAddr();
-  if( depSliceSegmentsEnabled )
+  if( depSliceSegmentsEnabled ) //> false
   {
     if((pcSlice->getSliceSegmentCurStartCUAddr()!= pcSlice->getSliceCurStartCUAddr())&&(uiCUAddr != uiTileStartLCU))
     {
@@ -914,15 +936,15 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
       CTXMem[0]->loadContexts(m_pcSbacCoder);
     }
   }
-  // for every CU in slice
+  // for every CU in slice，以编码顺序遍历
   UInt uiEncCUOrder;
   for( uiEncCUOrder = uiStartCUAddr/rpcPic->getNumPartInCU();
        uiEncCUOrder < (uiBoundingCUAddr+(rpcPic->getNumPartInCU()-1))/rpcPic->getNumPartInCU();
        uiCUAddr = rpcPic->getPicSym()->getCUOrderMap(++uiEncCUOrder) )
   {
     // initialize CU encoder
-    TComDataCU*& pcCU = rpcPic->getCU( uiCUAddr );
-    pcCU->initCU( rpcPic, uiCUAddr );
+    TComDataCU*& pcCU = rpcPic->getCU( uiCUAddr ); //> 以光栅顺序取出CU
+    pcCU->initCU( rpcPic, uiCUAddr );//> 初始化
 
 #if !RATE_CONTROL_LAMBDA_DOMAIN
     if(m_pcCfg->getUseRateCtrl())
@@ -942,6 +964,8 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
       //UInt uiSliceStartLCU = pcSlice->getSliceCurStartCUAddr();
       uiCol     = uiCUAddr % uiWidthInLCUs;
       uiLin     = uiCUAddr / uiWidthInLCUs;
+
+      // 多个SubStream 的设置，暂时无用
       if (pcSlice->getPPS()->getNumSubstreams() > 1)
       {
         // independent tiles => substreams are "per tile".  iNumSubstreams has already been multiplied.
@@ -1037,7 +1061,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
 #endif
 
       // run CU encoder
-      m_pcCuEncoder->compressCU( pcCU );
+      m_pcCuEncoder->compressCU( pcCU ); //> 进行当前CU的编码
 
 #if RATE_CONTROL_LAMBDA_DOMAIN
       if ( m_pcCfg->getUseRateCtrl() )
@@ -1536,6 +1560,7 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
   UInt tileHeightInLcu;
   UInt tileTotalCount;
 
+  // 默认Slice大小为整个frame
   uiStartCUAddrSlice        = pcSlice->getSliceCurStartCUAddr();
   UInt uiNumberOfCUsInFrame = rpcPic->getNumCUsInFrame();
   uiBoundingCUAddrSlice     = uiNumberOfCUsInFrame;
@@ -1583,7 +1608,7 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
     }
     pcSlice->setSliceCurEndCUAddr( uiBoundingCUAddrSlice );
   }
-  else
+  else //> 非Encode时候
   {
     UInt uiCUAddrIncrement     ;
     switch (m_pcCfg->getSliceMode())
@@ -1611,9 +1636,9 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
 
       uiBoundingCUAddrSlice    = ((uiStartCUAddrSlice + uiCUAddrIncrement) < uiNumberOfCUsInFrame*rpcPic->getNumPartInCU()) ? (uiStartCUAddrSlice + uiCUAddrIncrement) : uiNumberOfCUsInFrame*rpcPic->getNumPartInCU();
       break;
-    default:
-      uiCUAddrIncrement        = rpcPic->getNumCUsInFrame();
-      uiBoundingCUAddrSlice    = uiNumberOfCUsInFrame*rpcPic->getNumPartInCU();
+    default: //> 目前的cfg一般不对Slice做特殊的设置
+      uiCUAddrIncrement        = rpcPic->getNumCUsInFrame();//> Increment也应注意
+      uiBoundingCUAddrSlice    = uiNumberOfCUsInFrame*rpcPic->getNumPartInCU(); //> Slice的大小单位以最小的4x4的CU块为单位，即 256(LCU内4x4个数)*510(帧内LCU数目)
       break;
     } 
     // WPP: if a slice does not start at the beginning of a CTB row, it must end within the same CTB row
@@ -1624,6 +1649,7 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
     pcSlice->setSliceCurEndCUAddr( uiBoundingCUAddrSlice );
   }
 
+  //多个Slice的情况，目前暂未执行过
   Bool tileBoundary = false;
   if ((m_pcCfg->getSliceMode() == FIXED_NUMBER_OF_LCU || m_pcCfg->getSliceMode() == FIXED_NUMBER_OF_BYTES) && 
       (m_pcCfg->getNumRowsMinus1() > 0 || m_pcCfg->getNumColumnsMinus1() > 0))
@@ -1647,7 +1673,7 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
     }
   }
 
-  // Dependent slice
+  // Dependent slice, 过程完全同上
   UInt startCUAddrSliceSegment, boundingCUAddrSliceSegment;
   startCUAddrSliceSegment    = pcSlice->getSliceSegmentCurStartCUAddr();
   boundingCUAddrSliceSegment = uiNumberOfCUsInFrame;
@@ -1755,6 +1781,7 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
     }
   }
 
+  //将SliceSegment 缩小到和 Slice的Bounding一样大
   if(boundingCUAddrSliceSegment>uiBoundingCUAddrSlice)
   {
     boundingCUAddrSliceSegment = uiBoundingCUAddrSlice;
@@ -1762,6 +1789,7 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
   }
 
   //calculate real dependent slice start address
+  // 以下计算Slice的起始地址，其中值为光栅顺序
   UInt uiInternalAddress = rpcPic->getPicSym()->getPicSCUAddr(pcSlice->getSliceSegmentCurStartCUAddr()) % rpcPic->getNumPartInCU();
   UInt uiExternalAddress = rpcPic->getPicSym()->getPicSCUAddr(pcSlice->getSliceSegmentCurStartCUAddr()) / rpcPic->getNumPartInCU();
   UInt uiPosX = ( uiExternalAddress % rpcPic->getFrameWidthInCU() ) * g_uiMaxCUWidth+ g_auiRasterToPelX[ g_auiZscanToRaster[uiInternalAddress] ];
@@ -1770,6 +1798,7 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
   UInt uiHeight = pcSlice->getSPS()->getPicHeightInLumaSamples();
   while((uiPosX>=uiWidth||uiPosY>=uiHeight)&&!(uiPosX>=uiWidth&&uiPosY>=uiHeight))
   {
+    // x与y的值均小于width和height才行，不满足条件时候调整
     uiInternalAddress++;
     if(uiInternalAddress>=rpcPic->getNumPartInCU())
     {
@@ -1779,12 +1808,13 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
     uiPosX = ( uiExternalAddress % rpcPic->getFrameWidthInCU() ) * g_uiMaxCUWidth+ g_auiRasterToPelX[ g_auiZscanToRaster[uiInternalAddress] ];
     uiPosY = ( uiExternalAddress / rpcPic->getFrameWidthInCU() ) * g_uiMaxCUHeight+ g_auiRasterToPelY[ g_auiZscanToRaster[uiInternalAddress] ];
   }
+  // 正确的起始地址，单位同样以4x4最小CU。这里换算回编码顺序(由光栅顺序而来)
   UInt uiRealStartAddress = rpcPic->getPicSym()->getPicSCUEncOrder(uiExternalAddress*rpcPic->getNumPartInCU()+uiInternalAddress);
   
   pcSlice->setSliceSegmentCurStartCUAddr(uiRealStartAddress);
   startCUAddrSliceSegment=uiRealStartAddress;
   
-  //calculate real slice start address
+  //calculate real slice start address, 基本同上
   uiInternalAddress = rpcPic->getPicSym()->getPicSCUAddr(pcSlice->getSliceCurStartCUAddr()) % rpcPic->getNumPartInCU();
   uiExternalAddress = rpcPic->getPicSym()->getPicSCUAddr(pcSlice->getSliceCurStartCUAddr()) / rpcPic->getNumPartInCU();
   uiPosX = ( uiExternalAddress % rpcPic->getFrameWidthInCU() ) * g_uiMaxCUWidth+ g_auiRasterToPelX[ g_auiZscanToRaster[uiInternalAddress] ];

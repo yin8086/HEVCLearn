@@ -250,16 +250,18 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
   TEncSbac* pcSbacCoders = NULL;
   TComOutputBitstream* pcSubstreamsOut = NULL;
 
-  xInitGOP( iPOCLast, iNumPicRcvd, rcListPic, rcListPicYuvRecOut );
+  xInitGOP( iPOCLast, iNumPicRcvd, rcListPic, rcListPicYuvRecOut ); // 设置GOPSize
 
   m_iNumPicCoded = 0;
-  SEIPictureTiming pictureTimingSEI;
+  SEIPictureTiming pictureTimingSEI; // 存储SEI(重要信息)
 #if L0044_DU_DPB_OUTPUT_DELAY_HRD
   Int picSptDpbOutputDuDelay = 0;
 #endif
   UInt *accumBitsDU = NULL;
   UInt *accumNalsDU = NULL;
   SEIDecodingUnitInfo decodingUnitInfoSEI;
+
+  //操纵GOP 中每个元素
   for ( Int iGOPid=0; iGOPid < m_iGopSize; iGOPid++ )
   {
     UInt uiColDir = 1;
@@ -268,6 +270,8 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
 
     //select uiColDir
     Int iCloseLeft=1, iCloseRight=-1;
+
+    // 找到最近的左右方偏移
     for(Int i = 0; i<m_pcCfg->getGOPEntry(iGOPid).m_numRefPics; i++) 
     {
       Int iRef = m_pcCfg->getGOPEntry(iGOPid).m_referencePics[i];
@@ -280,6 +284,8 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
         iCloseLeft=iRef;
       }
     }
+    
+    // 计算最左最右的绝对POC，并将最左指针指向下一个GOP对应位置
     if(iCloseRight>-1)
     {
       iCloseRight=iCloseRight+m_pcCfg->getGOPEntry(iGOPid).m_POC-1;
@@ -292,6 +298,8 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
         iCloseLeft+=m_iGopSize;
       }
     }
+
+    // 完成左右具体位置的 QP 设定
     Int iLeftQP=0, iRightQP=0;
     for(Int i=0; i<m_iGopSize; i++)
     {
@@ -306,10 +314,11 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
     }
     if(iCloseRight>-1&&iRightQP<iLeftQP)
     {
-      uiColDir=0;
+      uiColDir=0;  // 非1即0
     }
 
     /////////////////////////////////////////////////////////////////////////////////////////////////// Initial to start encoding
+    // 计算poc位置方法，上一帧poc加上当前gop组中的相对POC即可得到新的绝对POC
     Int pocCurr = iPOCLast -iNumPicRcvd+ m_pcCfg->getGOPEntry(iGOPid).m_POC;
     Int iTimeOffset = m_pcCfg->getGOPEntry(iGOPid).m_POC;
     if(iPOCLast == 0)
@@ -458,6 +467,7 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
         }
       }
     }
+    // Long 时间的参考图像设置
     arrangeLongtermPicturesInRPS(pcSlice, rcListPic);
     TComRefPicListModification* refPicListModification = pcSlice->getRefPicListModification();
     refPicListModification->setRefPicListModificationFlagL0(0);
@@ -662,12 +672,16 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
 
     UInt uiNumSlices = 1;
 
+    // 实际上下面的几个地址均是以4x4大小的块为单位的坐标
+    // 且均为编码顺序(LCU内部顺序为Z ORDER)
     UInt uiInternalAddress = pcPic->getNumPartInCU()-4;
     UInt uiExternalAddress = pcPic->getPicSym()->getNumberOfCUsInFrame()-1;
     UInt uiPosX = ( uiExternalAddress % pcPic->getFrameWidthInCU() ) * g_uiMaxCUWidth+ g_auiRasterToPelX[ g_auiZscanToRaster[uiInternalAddress] ];
     UInt uiPosY = ( uiExternalAddress / pcPic->getFrameWidthInCU() ) * g_uiMaxCUHeight+ g_auiRasterToPelY[ g_auiZscanToRaster[uiInternalAddress] ];
     UInt uiWidth = pcSlice->getSPS()->getPicWidthInLumaSamples();
     UInt uiHeight = pcSlice->getSPS()->getPicHeightInLumaSamples();
+    
+    // 关键是找到最后一个4x4块的坐标
     while(uiPosX>=uiWidth||uiPosY>=uiHeight) 
     {
       uiInternalAddress--;
@@ -680,6 +694,7 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
       uiInternalAddress = 0;
       uiExternalAddress++;
     }
+    // 算出ENd的地址
     UInt uiRealEndAddress = uiExternalAddress*pcPic->getNumPartInCU()+uiInternalAddress;
 
     UInt uiCummulativeTileWidth;
@@ -687,13 +702,14 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
     Int  p, j;
     UInt uiEncCUAddr;
 
-    //set NumColumnsMinus1 and NumRowsMinus1
+    //set NumColumnsMinus1 and NumRowsMinus1 （即tile的行数和列数)
     pcPic->getPicSym()->setNumColumnsMinus1( pcSlice->getPPS()->getNumColumnsMinus1() );
     pcPic->getPicSym()->setNumRowsMinus1( pcSlice->getPPS()->getNumRowsMinus1() );
 
-    //create the TComTileArray
+    //create the TComTileArray (Tile 数组)
     pcPic->getPicSym()->xCreateTComTileArray();
 
+    // 设置Tile的宽和高
     if( pcSlice->getPPS()->getUniformSpacingFlag() == 1 )
     {
       //set the width for each tile
@@ -745,12 +761,14 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
       }
     }
     //intialize each tile of the current picture
-    pcPic->getPicSym()->xInitTiles();
+    pcPic->getPicSym()->xInitTiles(); //> 十分重要的函数，首地址，尾地址，以及Tile Map
 
     // Allocate some coders, now we know how many tiles there are.
     Int iNumSubstreams = pcSlice->getPPS()->getNumSubstreams();
 
     //generate the Coding Order Map and Inverse Coding Order Map
+    // 重要函数，设置COM,ICOM，将Cu的编码顺序映射到光栅顺序
+    // 编码顺序，先tile 间行序,tile内行序。cu内部为z 顺序
     for(p=0, uiEncCUAddr=0; p<pcPic->getPicSym()->getNumberOfCUsInFrame(); p++, uiEncCUAddr = pcPic->getPicSym()->xCalculateNxtCUAddr(uiEncCUAddr))
     {
       pcPic->getPicSym()->setCUOrderMap(p, uiEncCUAddr);
@@ -760,10 +778,12 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
     pcPic->getPicSym()->setInverseCUOrderMap(pcPic->getPicSym()->getNumberOfCUsInFrame(), pcPic->getPicSym()->getNumberOfCUsInFrame());
 
     // Allocate some coders, now we know how many tiles there are.
+    // 完成一系列的编码器的初始化
     m_pcEncTop->createWPPCoders(iNumSubstreams);
     pcSbacCoders = m_pcEncTop->getSbacCoders();
     pcSubstreamsOut = new TComOutputBitstream[iNumSubstreams];
 
+    // Slice以及Slice segment的出事CU 地址的设置，刚开始均为0
     UInt startCUAddrSliceIdx = 0; // used to index "m_uiStoredStartCUAddrForEncodingSlice" containing locations of slice boundaries
     UInt startCUAddrSlice    = 0; // used to keep track of current slice's starting CU addr.
     pcSlice->setSliceCurStartCUAddr( startCUAddrSlice ); // Setting "start CU addr" for current slice
@@ -782,11 +802,12 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
 
     while(nextCUAddr<uiRealEndAddress) // determine slice boundaries
     {
+      // 对于每个Slice(Slice Segment)进行合理的处理
       pcSlice->setNextSlice       ( false );
       pcSlice->setNextSliceSegment( false );
       assert(pcPic->getNumAllocatedSlice() == startCUAddrSliceIdx);
-      m_pcSliceEncoder->precompressSlice( pcPic );
-      m_pcSliceEncoder->compressSlice   ( pcPic );
+      m_pcSliceEncoder->precompressSlice( pcPic ); //> 是否存在多QP
+      m_pcSliceEncoder->compressSlice   ( pcPic ); //> 核心的压缩Slice函数
 
       Bool bNoBinBitConstraintViolated = (!pcSlice->isNextSlice() && !pcSlice->isNextSliceSegment());
       if (pcSlice->isNextSlice() || (bNoBinBitConstraintViolated && m_pcCfg->getSliceMode()==FIXED_NUMBER_OF_LCU))
@@ -1786,6 +1807,7 @@ Void TEncGOP::xInitGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rcLis
 {
   assert( iNumPicRcvd > 0 );
   //  Exception for the first frame
+  // 第一帧是要严肃处理，将其GOP固定为1
   if ( iPOCLast == 0 )
   {
     m_iGopSize    = 1;
@@ -1798,6 +1820,9 @@ Void TEncGOP::xInitGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rcLis
   return;
 }
 
+/// 将rpcPic以及rpcPicYuvRecOut指针指向buffer的对应位置
+///
+/// 返回值是rpcPic以及rpcPicYuvRecOut
 Void TEncGOP::xGetBuffer( TComList<TComPic*>&      rcListPic,
                          TComList<TComPicYuv*>&    rcListPicYuvRecOut,
                          Int                       iNumPicRcvd,
