@@ -187,18 +187,19 @@ Void TComPattern::initAdiPattern( TComDataCU* pcCU, UInt uiZorderIdxInPart, UInt
   Int   iUnitSize = 0;
   Int   iNumUnitsInCu = 0;
   Int   iTotalUnits = 0;
-  Bool  bNeighborFlags[4 * MAX_NUM_SPU_W + 1];
-  Int   iNumIntraNeighbor = 0;
+  Bool  bNeighborFlags[4 * MAX_NUM_SPU_W + 1]; //> (四个方向样点可用性)4 * 128/4 + 1 = 129
+  Int   iNumIntraNeighbor = 0; //> 给可用相邻快计数
   
   UInt uiPartIdxLT, uiPartIdxRT, uiPartIdxLB;
 
-  
+  // 左上，右上，左下角的ZOrder,以(4x4)块为单位
   pcCU->deriveLeftRightTopIdxAdi( uiPartIdxLT, uiPartIdxRT, uiZorderIdxInPart, uiPartDepth );
   pcCU->deriveLeftBottomIdxAdi  ( uiPartIdxLB,              uiZorderIdxInPart, uiPartDepth );
   
+  // 基本单元4x4
   iUnitSize      = g_uiMaxCUWidth >> g_uiMaxCUDepth;
   iNumUnitsInCu  = uiCuWidth / iUnitSize;
-  iTotalUnits    = (iNumUnitsInCu << 2) + 1;
+  iTotalUnits    = (iNumUnitsInCu << 2) + 1;//> 总共有左下，左(iNum *2),  上，右上(iNum*2),左上角(1)
 
   bNeighborFlags[iNumUnitsInCu*2] = isAboveLeftAvailable( pcCU, uiPartIdxLT );
   iNumIntraNeighbor  += (Int)(bNeighborFlags[iNumUnitsInCu*2]);
@@ -210,6 +211,7 @@ Void TComPattern::initAdiPattern( TComDataCU* pcCU, UInt uiZorderIdxInPart, UInt
   bAbove = true;
   bLeft  = true;
 
+  // 左边64*2,上边64*2,左上1个，一共这么多
   uiWidth=uiCuWidth2+1;
   uiHeight=uiCuHeight2+1;
   
@@ -218,6 +220,7 @@ Void TComPattern::initAdiPattern( TComDataCU* pcCU, UInt uiZorderIdxInPart, UInt
     return;
   }
   
+  // 指向当前PU左上角
   piRoiOrigin = pcCU->getPic()->getPicYuvRec()->getLumaAddr(pcCU->getAddr(), pcCU->getZorderIdxInCU()+uiZorderIdxInPart);
   piAdiTemp   = piAdiBuf;
 
@@ -374,21 +377,21 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
   Int  i, j;
   Int  iDCValue = 1 << (bitDepth - 1);
 
-  if (iNumIntraNeighbor == 0)
+  if (iNumIntraNeighbor == 0) //> 所有样点均不存在,一共 1+128+128个位置
   {
     // Fill border with DC value
-    for (i=0; i<uiWidth; i++)
+    for (i=0; i<uiWidth; i++) //> 左上一块，上面一条，右上一条
     {
       piAdiTemp[i] = iDCValue;
     }
-    for (i=1; i<uiHeight; i++)
+    for (i=1; i<uiHeight; i++)//> 左一条，左下一条
     {
       piAdiTemp[i*uiWidth] = iDCValue;
     }
   }
-  else if (iNumIntraNeighbor == iTotalUnits)
+  else if (iNumIntraNeighbor == iTotalUnits) //> 样点均存在
   {
-    // Fill top-left border with rec. samples
+    // Fill top-left border with rec. samples, 左上一点
     piRoiTemp = piRoiOrigin - iPicStride - 1;
     piAdiTemp[0] = piRoiTemp[0];
 
@@ -400,14 +403,14 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
       piRoiTemp --; // move to the second left column
     }
 
-    for (i=0; i<uiCuHeight; i++)
+    for (i=0; i<uiCuHeight; i++) // 左边一条
     {
       piAdiTemp[(1+i)*uiWidth] = piRoiTemp[0];
       piRoiTemp += iPicStride;
     }
 
     // Fill below left border with rec. samples
-    for (i=0; i<uiCuHeight; i++)
+    for (i=0; i<uiCuHeight; i++) // 左下一条
     {
       piAdiTemp[(1+uiCuHeight+i)*uiWidth] = piRoiTemp[0];
       piRoiTemp += iPicStride;
@@ -415,14 +418,14 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
 
     // Fill top border with rec. samples
     piRoiTemp = piRoiOrigin - iPicStride;
-    for (i=0; i<uiCuWidth; i++)
+    for (i=0; i<uiCuWidth; i++)  // 上边一条
     {
       piAdiTemp[1+i] = piRoiTemp[i];
     }
     
     // Fill top right border with rec. samples
     piRoiTemp = piRoiOrigin - iPicStride + uiCuWidth;
-    for (i=0; i<uiCuWidth; i++)
+    for (i=0; i<uiCuWidth; i++)  // 右上一条
     {
       piAdiTemp[1+uiCuWidth+i] = piRoiTemp[i];
     }
@@ -430,14 +433,14 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
   else // reference samples are partially available
   {
     Int  iNumUnits2 = iNumUnitsInCu<<1;
-    Int  iTotalSamples = iTotalUnits*iUnitSize;
+    Int  iTotalSamples = iTotalUnits*iUnitSize; // 四个方向处取样总共单元数,16*4 + 1
     Pel  piAdiLine[5 * MAX_CU_SIZE];
     Pel  *piAdiLineTemp; 
     Bool *pbNeighborFlags;
     Int  iNext, iCurr;
     Pel  piRef = 0;
 
-    // Initialize
+    // Initialize, 以DC初始化
     for (i=0; i<iTotalSamples; i++)
     {
       piAdiLine[i] = iDCValue;
@@ -445,32 +448,32 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
     
     // Fill top-left sample
     piRoiTemp = piRoiOrigin - iPicStride - 1;
-    piAdiLineTemp = piAdiLine + (iNumUnits2*iUnitSize);
-    pbNeighborFlags = bNeighborFlags + iNumUnits2;
+    piAdiLineTemp = piAdiLine + (iNumUnits2*iUnitSize); //左上角块的位置，以像素为单位，因此乘以iUnitSize
+    pbNeighborFlags = bNeighborFlags + iNumUnits2; //左上角块是否存在,以Unit为单位
     if (*pbNeighborFlags)
     {
-      piAdiLineTemp[0] = piRoiTemp[0];
+      piAdiLineTemp[0] = piRoiTemp[0]; //取用Rec的像素值
       for (i=1; i<iUnitSize; i++)
       {
-        piAdiLineTemp[i] = piAdiLineTemp[0];
+        piAdiLineTemp[i] = piAdiLineTemp[0]; // 取用前面一点的值
       }
     }
 
-    // Fill left & below-left samples
+    // Fill left & below-left samples，只填充存在的点为重建图像的值
     piRoiTemp += iPicStride;
-    if (bLMmode)
+    if (bLMmode) // 一直是false
     {
       piRoiTemp --; // move the second left column
     }
     piAdiLineTemp--;
     pbNeighborFlags--;
-    for (j=0; j<iNumUnits2; j++)
+    for (j=0; j<iNumUnits2; j++) //左下，左侧一一检查
     {
       if (*pbNeighborFlags)
       {
         for (i=0; i<iUnitSize; i++)
         {
-          piAdiLineTemp[-i] = piRoiTemp[i*iPicStride];
+          piAdiLineTemp[-i] = piRoiTemp[i*iPicStride]; // *(ptr-i) ,4个全部用重建图像像素
         }
       }
       piRoiTemp += iUnitSize*iPicStride;
@@ -478,7 +481,7 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
       pbNeighborFlags--;
     }
 
-    // Fill above & above-right samples
+    // Fill above & above-right samples，只填充存在的点为重建图像的值
     piRoiTemp = piRoiOrigin - iPicStride;
     piAdiLineTemp = piAdiLine + ((iNumUnits2+1)*iUnitSize);
     pbNeighborFlags = bNeighborFlags + iNumUnits2 + 1;
@@ -500,19 +503,19 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
     iCurr = 0;
     iNext = 1;
     piAdiLineTemp = piAdiLine;
-    while (iCurr < iTotalUnits)
+    while (iCurr < iTotalUnits) // 一个个单元循环
     {
-      if (!bNeighborFlags[iCurr])
+      if (!bNeighborFlags[iCurr]) // 此单元不存在
       {
-        if(iCurr == 0)
+        if(iCurr == 0) // 第一块就不存在
         {
-          while (iNext < iTotalUnits && !bNeighborFlags[iNext])
+          while (iNext < iTotalUnits && !bNeighborFlags[iNext])// 找到收个存在的
           {
-            iNext++;
+            iNext++; 
           }
-          piRef = piAdiLine[iNext*iUnitSize];
+          piRef = piAdiLine[iNext*iUnitSize]; //取出此块
           // Pad unavailable samples with new value
-          while (iCurr < iNext)
+          while (iCurr < iNext) // 把此块前面的全填充成picRef
           {
             for (i=0; i<iUnitSize; i++)
             {
@@ -522,7 +525,7 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
             iCurr++;
           }
         }
-        else
+        else // 用前一块最后个像素填充
         {
           piRef = piAdiLine[iCurr*iUnitSize-1];
           for (i=0; i<iUnitSize; i++)
@@ -541,13 +544,13 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
     }
 
     // Copy processed samples
-    piAdiLineTemp = piAdiLine + uiHeight + iUnitSize - 2;
-    for (i=0; i<uiWidth; i++)
+    piAdiLineTemp = piAdiLine + uiHeight + iUnitSize - 2; //> 128 + 3 = 131
+    for (i=0; i<uiWidth; i++) // 左上，上，右上
     {
       piAdiTemp[i] = piAdiLineTemp[i];
     }
-    piAdiLineTemp = piAdiLine + uiHeight - 1;
-    for (i=1; i<uiHeight; i++)
+    piAdiLineTemp = piAdiLine + uiHeight - 1; //> 128
+    for (i=1; i<uiHeight; i++) // 左下，左
     {
       piAdiTemp[i*uiWidth] = piAdiLineTemp[-i];
     }

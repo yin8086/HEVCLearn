@@ -1206,6 +1206,7 @@ TComDataCU* TComDataCU::getPUAbove( UInt& uiAPartUnitIdx,
     return NULL;
   }
   
+  // LCU 最后一行的首个元素ZOrder
   uiAPartUnitIdx = g_auiRasterToZscan[ uiAbsPartIdx + m_pcPic->getNumPartInCU() - uiNumPartInCUWidth ];
 
   if ( (bEnforceSliceRestriction && (m_pcCUAbove==NULL || m_pcCUAbove->getSlice()==NULL || m_pcCUAbove->getSCUAddr()+uiAPartUnitIdx < m_pcPic->getCU( getAddr() )->getSliceStartCU(uiCurrPartUnitIdx)))
@@ -1220,14 +1221,15 @@ TComDataCU* TComDataCU::getPUAbove( UInt& uiAPartUnitIdx,
 
 TComDataCU* TComDataCU::getPUAboveLeft( UInt& uiALPartUnitIdx, UInt uiCurrPartUnitIdx, Bool bEnforceSliceRestriction )
 {
-  UInt uiAbsPartIdx       = g_auiZscanToRaster[uiCurrPartUnitIdx];
-  UInt uiAbsZorderCUIdx   = g_auiZscanToRaster[m_uiAbsIdxInLCU];
-  UInt uiNumPartInCUWidth = m_pcPic->getNumPartInWidth();
+  UInt uiAbsPartIdx       = g_auiZscanToRaster[uiCurrPartUnitIdx]; //> CU左上角的位置Units的Zorder idx
+  UInt uiAbsZorderCUIdx   = g_auiZscanToRaster[m_uiAbsIdxInLCU]; //> 当前CU在LCU中的Zorder idx
+  UInt uiNumPartInCUWidth = m_pcPic->getNumPartInWidth(); //> LCU=64时均为16
   
   if ( !RasterAddress::isZeroCol( uiAbsPartIdx, uiNumPartInCUWidth ) )
   {
     if ( !RasterAddress::isZeroRow( uiAbsPartIdx, uiNumPartInCUWidth ) )
     {
+      // 非0行，0列正常左上角元素的。实际上也是非LCU的子块时候（Width<64)
       uiALPartUnitIdx = g_auiRasterToZscan[ uiAbsPartIdx - uiNumPartInCUWidth - 1 ];
       if ( RasterAddress::isEqualRowOrCol( uiAbsPartIdx, uiAbsZorderCUIdx, uiNumPartInCUWidth ) )
       {
@@ -1265,6 +1267,7 @@ TComDataCU* TComDataCU::getPUAboveLeft( UInt& uiALPartUnitIdx, UInt uiCurrPartUn
     return m_pcCULeft;
   }
   
+  // AboveLeft的单元的ZScan 顺序，此情况下，此元素必定为左上角CU的右下角元素，即ZOrder 255
   uiALPartUnitIdx = g_auiRasterToZscan[ m_pcPic->getNumPartInCU() - 1 ];
   if ( (bEnforceSliceRestriction && (m_pcCUAboveLeft==NULL || m_pcCUAboveLeft->getSlice()==NULL ||
        m_pcCUAboveLeft->getSCUAddr()+uiALPartUnitIdx < m_pcPic->getCU( getAddr() )->getSliceStartCU(uiCurrPartUnitIdx)||
