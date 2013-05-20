@@ -76,43 +76,43 @@ Void TComPicYuv::create( Int iPicWidth, Int iPicHeight, UInt uiMaxCUWidth, UInt 
   m_iCuWidth        = uiMaxCUWidth;
   m_iCuHeight       = uiMaxCUHeight;
 
-  // ĞĞÁĞµÄCU¸öÊı¼ÆËã
+  // è¡Œåˆ—çš„CUä¸ªæ•°è®¡ç®—
   Int numCuInWidth  = m_iPicWidth  / m_iCuWidth  + (m_iPicWidth  % m_iCuWidth  != 0);
   Int numCuInHeight = m_iPicHeight / m_iCuHeight + (m_iPicHeight % m_iCuHeight != 0);
   
-  // MarginµÈÓÚ MaxCU + 16
+  // Marginç­‰äº MaxCU + 16
   m_iLumaMarginX    = g_uiMaxCUWidth  + 16; // for 16-byte alignment
   m_iLumaMarginY    = g_uiMaxCUHeight + 16;  // margin for 8-tap filter and infinite padding
   
   m_iChromaMarginX  = m_iLumaMarginX>>1;
   m_iChromaMarginY  = m_iLumaMarginY>>1;
   
-  // Pel¼´ÊÇshort£¬Buffer´óĞ¡ÊÇ (Width + MarginX * 2) * (Height + MarginY * 2)
+  // Pelå³æ˜¯shortï¼ŒBufferå¤§å°æ˜¯ (Width + MarginX * 2) * (Height + MarginY * 2)
   m_apiPicBufY      = (Pel*)xMalloc( Pel, ( m_iPicWidth       + (m_iLumaMarginX  <<1)) * ( m_iPicHeight       + (m_iLumaMarginY  <<1)));
   m_apiPicBufU      = (Pel*)xMalloc( Pel, ((m_iPicWidth >> 1) + (m_iChromaMarginX<<1)) * ((m_iPicHeight >> 1) + (m_iChromaMarginY<<1)));
   m_apiPicBufV      = (Pel*)xMalloc( Pel, ((m_iPicWidth >> 1) + (m_iChromaMarginX<<1)) * ((m_iPicHeight >> 1) + (m_iChromaMarginY<<1)));
   
-  // ½«Ö¸ÕëÍùÇ°ÒÆ¶¯ MarginY * Stride + MarginX
+  // å°†æŒ‡é’ˆå¾€å‰ç§»åŠ¨ MarginY * Stride + MarginX
   m_piPicOrgY       = m_apiPicBufY + m_iLumaMarginY   * getStride()  + m_iLumaMarginX;
   m_piPicOrgU       = m_apiPicBufU + m_iChromaMarginY * getCStride() + m_iChromaMarginX;
   m_piPicOrgV       = m_apiPicBufV + m_iChromaMarginY * getCStride() + m_iChromaMarginX;
   
   m_bIsBorderExtended = false;
   
-  // CUÍø¸ñ£¬¶ÔÓ¦Ò»¸ö¶şÎ¬µÄCU¾ØÕó
+  // CUç½‘æ ¼ï¼Œå¯¹åº”ä¸€ä¸ªäºŒç»´çš„CUçŸ©é˜µ
   m_cuOffsetY = new Int[numCuInWidth * numCuInHeight];
   m_cuOffsetC = new Int[numCuInWidth * numCuInHeight];
   for (Int cuRow = 0; cuRow < numCuInHeight; cuRow++)
   {
     for (Int cuCol = 0; cuCol < numCuInWidth; cuCol++)
     {
-      // Êµ¼ÊÉÏÃ¿¸öcuOffsetËù¸³µÄÖµ¼´Îª´ËCU×óÉÏ½ÇµÄÍ¼ÏñÄÚÊı¾İÆ«ÒÆÖµ
+      // å®é™…ä¸Šæ¯ä¸ªcuOffsetæ‰€èµ‹çš„å€¼å³ä¸ºæ­¤CUå·¦ä¸Šè§’çš„å›¾åƒå†…æ•°æ®åç§»å€¼
       m_cuOffsetY[cuRow * numCuInWidth + cuCol] = getStride() * cuRow * m_iCuHeight + cuCol * m_iCuWidth;
       m_cuOffsetC[cuRow * numCuInWidth + cuCol] = getCStride() * cuRow * (m_iCuHeight / 2) + cuCol * (m_iCuWidth / 2);
     }
   }
   
-  //BU¾ØÕó£¬Õâ¸ö²»¸´ÔÓ£¬¾ÍÊÇLCUÄÚ²¿·Ö³É 2^(Depth *2£© ¸ö²¿·Ö£¬Ä¿Ç°ÊÇ64*64·Ö³É256¸ö4*4
+  //BUçŸ©é˜µï¼Œè¿™ä¸ªä¸å¤æ‚ï¼Œå°±æ˜¯LCUå†…éƒ¨åˆ†æˆ 2^(Depth *2ï¼‰ ä¸ªéƒ¨åˆ†ï¼Œç›®å‰æ˜¯64*64åˆ†æˆ256ä¸ª4*4
   m_buOffsetY = new Int[(size_t)1 << (2 * uiMaxCUDepth)];
   m_buOffsetC = new Int[(size_t)1 << (2 * uiMaxCUDepth)];
   for (Int buRow = 0; buRow < (1 << uiMaxCUDepth); buRow++)

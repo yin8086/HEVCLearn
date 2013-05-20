@@ -247,13 +247,13 @@ static Bool readPlane(Pel* dst, istream& fd, Bool is16bit,
                       UInt width, UInt height,
                       UInt pad_x, UInt pad_y)
 {
-  // 8bit¶Áchar,16bit¶Áshort£¬ÄÚ²¿´æ´¢×ÜÊÇÓÃshort
+  // 8bitè¯»char,16bitè¯»shortï¼Œå†…éƒ¨å­˜å‚¨æ€»æ˜¯ç”¨short
   Int read_len = width * (is16bit ? 2 : 1);
 
   UChar *buf = new UChar[read_len];
   for (Int y = 0; y < height; y++)
   {
-    // Ò»´Î¶ÁÒ»ÐÐ
+    // ä¸€æ¬¡è¯»ä¸€è¡Œ
     fd.read(reinterpret_cast<Char*>(buf), read_len);
 
     if (fd.eof() || fd.fail() )
@@ -279,7 +279,7 @@ static Bool readPlane(Pel* dst, istream& fd, Bool is16bit,
 
     for (Int x = width; x < width + pad_x; x++)
     {
-      // ÓÃWidth´¦ÏñËØ²¹Æë
+      // ç”¨Widthå¤„åƒç´ è¡¥é½
       dst[x] = dst[width - 1];
     }
     dst += stride;
@@ -288,7 +288,7 @@ static Bool readPlane(Pel* dst, istream& fd, Bool is16bit,
   {
     for (Int x = 0; x < width + pad_x; x++)
     {
-      // ÓÃHeight´¦ÏñËØ²¹Æë
+      // ç”¨Heightå¤„åƒç´ è¡¥é½
       dst[x] = (dst - stride)[x];
     }
     dst += stride;
@@ -393,12 +393,12 @@ Bool TVideoIOYuv::read ( TComPicYuv*  pPicYuv, Int aiPad[2] )
     maxvalC = (0xff << (desired_bitdepthC - 8)) -1;
   }
 #endif
-  // Ò»´Î¶ÁÒ»¸ölumaÖ¡
+  // ä¸€æ¬¡è¯»ä¸€ä¸ªlumaå¸§
   if (! readPlane(pPicYuv->getLumaAddr(), m_cHandle, is16bit, iStride, width, height, pad_h, pad_v))
     return false;
   scalePlane(pPicYuv->getLumaAddr(), iStride, width_full, height_full, m_bitDepthShiftY, minvalY, maxvalY);
 
-  // Í³Í³³ýÒÔ2ÔÙÀ´¶ÁÈ¡ Cb, Cr
+  // ç»Ÿç»Ÿé™¤ä»¥2å†æ¥è¯»å– Cb, Cr
   iStride >>= 1;
   width_full >>= 1;
   height_full >>= 1;

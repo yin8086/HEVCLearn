@@ -2440,7 +2440,7 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
   UInt    uiInitTrDepth  = pcCU->getPartitionSize(0) == SIZE_2Nx2N ? 0 : 1;
   UInt    uiWidth        = pcCU->getWidth (0) >> uiInitTrDepth;
   UInt    uiHeight       = pcCU->getHeight(0) >> uiInitTrDepth;
-  UInt    uiQNumParts    = pcCU->getTotalNumPart() >> 2; // 256 >> 2 = 64 ÇĞ4¿é£¬Ã¿¸öĞ¡¿éµÄpartÊıÄ¿?
+  UInt    uiQNumParts    = pcCU->getTotalNumPart() >> 2; // 256 >> 2 = 64 åˆ‡4å—ï¼Œæ¯ä¸ªå°å—çš„partæ•°ç›®?
   UInt    uiWidthBit     = pcCU->getIntraSizeIdx(0);
   UInt    uiOverallDistY = 0;
   UInt    uiOverallDistC = 0;
@@ -2459,9 +2459,9 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
   
   //===== loop over partitions =====
   UInt uiPartOffset = 0;
-  // ¿´À´ÕâÀïÊÇPUµÄ»®·Ö
+  // çœ‹æ¥è¿™é‡Œæ˜¯PUçš„åˆ’åˆ†
   for( UInt uiPU = 0; uiPU < uiNumPU; uiPU++, uiPartOffset += uiQNumParts )
-  { //¿´À´uiQNumParts¾ÍÊÇÎªÁËNxN»®·ÖÊ±½øĞĞµØÖ·µİÔöÊ¹ÓÃµÄ,2Nx2NÊ±ÎŞÓÃ
+  { //çœ‹æ¥uiQNumPartså°±æ˜¯ä¸ºäº†NxNåˆ’åˆ†æ—¶è¿›è¡Œåœ°å€é€’å¢ä½¿ç”¨çš„,2Nx2Næ—¶æ— ç”¨
     //===== init pattern for luma prediction =====
     Bool bAboveAvail = false;
     Bool bLeftAvail  = false;

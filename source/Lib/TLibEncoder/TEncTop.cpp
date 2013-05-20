@@ -165,7 +165,7 @@ Void TEncTop::createWPPCoders(Int iNumSubstreams)
     return; // already generated.
   }
 
-  // SABC±àÂëÆ÷µÈÒ»Ð©ÁÐ¶ÔÏó
+  // SABCç¼–ç å™¨ç­‰ä¸€äº›åˆ—å¯¹è±¡
   m_iNumSubstreams         = iNumSubstreams;
   m_pcSbacCoders           = new TEncSbac       [iNumSubstreams];
   m_pcBinCoderCABACs       = new TEncBinCABAC   [iNumSubstreams];
@@ -403,7 +403,7 @@ Void TEncTop::xGetNewPicBuffer ( TComPic*& rpcPic )
 {
   TComSlice::sortPicList(m_cListPic);
   
-  // ´óÖÂ¸Ð¾õ¾ÍÊÇÊ¹ÓÃring bufferÈ¡Æ¥ÅäµÄ£¬»òÕß´´½¨ÐÂµÄ·µ»Ø
+  // å¤§è‡´æ„Ÿè§‰å°±æ˜¯ä½¿ç”¨ring bufferå–åŒ¹é…çš„ï¼Œæˆ–è€…åˆ›å»ºæ–°çš„è¿”å›ž
   if (m_cListPic.size() >= (UInt)(m_iGOPSize + getMaxDecPicBuffering(MAX_TLAYER-1) + 2) )
   {
     TComList<TComPic*>::iterator iterPic  = m_cListPic.begin();

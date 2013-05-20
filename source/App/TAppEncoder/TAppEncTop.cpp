@@ -407,7 +407,7 @@ Void TAppEncTop::encode()
     // get buffers
     xGetBuffer(pcPicYuvRec);
 
-    // read input YUV file,·ÅÈë buffer ÖÐ
+    // read input YUV file,æ”¾å…¥ buffer ä¸­
     m_cTVideoIOYuvInputFile.read( pcPicYuvOrg, m_aiPad );
 
     // increase number of received frames
@@ -470,22 +470,22 @@ Void TAppEncTop::xGetBuffer( TComPicYuv*& rpcPicYuvRec)
   assert( m_iGOPSize > 0 );
 
   // org. buffer
-  // ²é¿´Í¼ÏñbufferÀïÃæµÄµÄÍ¼ÏñÊÇ·ñÒÑ¾­·ÅÂú
+  // æŸ¥çœ‹å›¾åƒbufferé‡Œé¢çš„çš„å›¾åƒæ˜¯å¦å·²ç»æ”¾æ»¡
   if ( m_cListPicYuvRec.size() == (UInt)m_iGOPSize )
   {
-    //fullÔòµ¯³ö¶ÓÍ·
+    //fullåˆ™å¼¹å‡ºé˜Ÿå¤´
     rpcPicYuvRec = m_cListPicYuvRec.popFront();
 
   }
   else
   {
-    // ·ÇfullÔò´´½¨ÐÂµÄ
+    // éžfullåˆ™åˆ›å»ºæ–°çš„
     rpcPicYuvRec = new TComPicYuv;
 
     rpcPicYuvRec->create( m_iSourceWidth, m_iSourceHeight, m_uiMaxCUWidth, m_uiMaxCUHeight, m_uiMaxCUDepth );
 
   }
-  // ·ÅÖÃµ½»òÕßÒÆ¶¯µ½¶ÓÎ²
+  // æ”¾ç½®åˆ°æˆ–è€…ç§»åŠ¨åˆ°é˜Ÿå°¾
   m_cListPicYuvRec.pushBack( rpcPicYuvRec );
 }
 

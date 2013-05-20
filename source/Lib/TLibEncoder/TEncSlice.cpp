@@ -760,12 +760,12 @@ Void TEncSlice::precompressSlice( TComPic*& rpcPic )
 Void TEncSlice::compressSlice( TComPic*& rpcPic )
 {
   UInt  uiCUAddr;
-  UInt   uiStartCUAddr; //> SliceµÄÆğÊ¼µØÖ·
-  UInt   uiBoundingCUAddr; //> SliceµÄ½áÊøµØÖ·
+  UInt   uiStartCUAddr; //> Sliceçš„èµ·å§‹åœ°å€
+  UInt   uiBoundingCUAddr; //> Sliceçš„ç»“æŸåœ°å€
   rpcPic->getSlice(getSliceIdx())->setSliceSegmentBits(0);
   TEncBinCABAC* pppcRDSbacCoder = NULL;
   TComSlice* pcSlice            = rpcPic->getSlice(getSliceIdx());
-  xDetermineStartAndBoundingCUAddr ( uiStartCUAddr, uiBoundingCUAddr, rpcPic, false );//> È·¶¨µ±Ç°SliceµÄ±ß½ç
+  xDetermineStartAndBoundingCUAddr ( uiStartCUAddr, uiBoundingCUAddr, rpcPic, false );//> ç¡®å®šå½“å‰Sliceçš„è¾¹ç•Œ
   
   // initialize cost values
   m_uiPicTotalBits  = 0;
@@ -775,7 +775,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
   // set entropy coder
   if( m_pcCfg->getUseSBACRD() )
   {
-    // ìØ±àÂëÆ÷µÄÒ»Ğ©³õÊ¼»¯£¬ÕâÀïÒıÓÃÁËRDÓÃµÄSBac
+    // ç†µç¼–ç å™¨çš„ä¸€äº›åˆå§‹åŒ–ï¼Œè¿™é‡Œå¼•ç”¨äº†RDç”¨çš„SBac
     m_pcSbacCoder->init( m_pcBinCABAC );
     m_pcEntropyCoder->setEntropyCoder   ( m_pcSbacCoder, pcSlice );
     m_pcEntropyCoder->resetEntropy      ();
@@ -797,7 +797,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
   // calculate AC/DC values for current picture
   if( pcSlice->getPPS()->getUseWP() || pcSlice->getPPS()->getWPBiPred() )
   {
-    // Î´ÆôÓÃ
+    // æœªå¯ç”¨
     xCalcACDCParamSlice(pcSlice);
   }
 
@@ -831,7 +831,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
     }
   }
 #endif
-  // È¥³ı¶ÔÏó£¬×¼±¸¿ªÊ¼
+  // å»é™¤å¯¹è±¡ï¼Œå‡†å¤‡å¼€å§‹
   TEncTop* pcEncTop = (TEncTop*) m_pcCfg;
   TEncSbac**** ppppcRDSbacCoders    = pcEncTop->getRDSbacCoders();
   TComBitCounter* pcBitCounters     = pcEncTop->getBitCounters();
@@ -841,10 +841,10 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
   if( m_pcCfg->getUseSBACRD() )
   {
     iNumSubstreams = pcSlice->getPPS()->getNumSubstreams();
-    uiTilesAcross = rpcPic->getPicSym()->getNumColumnsMinus1()+1; //> tile´©¹ı¼¸¸öTile
+    uiTilesAcross = rpcPic->getPicSym()->getNumColumnsMinus1()+1; //> tileç©¿è¿‡å‡ ä¸ªTile
     delete[] m_pcBufferSbacCoders;
     delete[] m_pcBufferBinCoderCABACs;
-    m_pcBufferSbacCoders     = new TEncSbac    [uiTilesAcross];//> ¸ù¾İ´©¹ıÊı·ÖÅä¶à¸öbuff ±àÂëÆ÷
+    m_pcBufferSbacCoders     = new TEncSbac    [uiTilesAcross];//> æ ¹æ®ç©¿è¿‡æ•°åˆ†é…å¤šä¸ªbuff ç¼–ç å™¨
     m_pcBufferBinCoderCABACs = new TEncBinCABAC[uiTilesAcross];
     for (Int ui = 0; ui < uiTilesAcross; ui++)
     {
@@ -861,7 +861,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
     }
   }
   //if( m_pcCfg->getUseSBACRD() )
-  { //> ÀàËÆÉÏÃæ£¬lowbuffer£¬¹¦ÓÃÎ´Öª
+  { //> ç±»ä¼¼ä¸Šé¢ï¼Œlowbufferï¼ŒåŠŸç”¨æœªçŸ¥
     delete[] m_pcBufferLowLatSbacCoders;
     delete[] m_pcBufferLowLatBinCoderCABACs;
     m_pcBufferLowLatSbacCoders     = new TEncSbac    [uiTilesAcross];
@@ -883,7 +883,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
   uiCUAddr = rpcPic->getPicSym()->getCUOrderMap( uiStartCUAddr /rpcPic->getNumPartInCU());
   
 
-#if 0 //> ²âÊÔCOM£¬ÒÔ¼°ICOM
+#if 0 //> æµ‹è¯•COMï¼Œä»¥åŠICOM
   for (int i = 0; i < 256; i++)
   {
     std::cout.width(4);
@@ -936,15 +936,15 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
       CTXMem[0]->loadContexts(m_pcSbacCoder);
     }
   }
-  // for every CU in slice£¬ÒÔ±àÂëË³Ğò±éÀú
+  // for every CU in sliceï¼Œä»¥ç¼–ç é¡ºåºéå†
   UInt uiEncCUOrder;
   for( uiEncCUOrder = uiStartCUAddr/rpcPic->getNumPartInCU();
        uiEncCUOrder < (uiBoundingCUAddr+(rpcPic->getNumPartInCU()-1))/rpcPic->getNumPartInCU();
        uiCUAddr = rpcPic->getPicSym()->getCUOrderMap(++uiEncCUOrder) )
   {
     // initialize CU encoder
-    TComDataCU*& pcCU = rpcPic->getCU( uiCUAddr ); //> ÒÔ¹âÕ¤Ë³ĞòÈ¡³öCU
-    pcCU->initCU( rpcPic, uiCUAddr );//> ³õÊ¼»¯
+    TComDataCU*& pcCU = rpcPic->getCU( uiCUAddr ); //> ä»¥å…‰æ …é¡ºåºå–å‡ºCU
+    pcCU->initCU( rpcPic, uiCUAddr );//> åˆå§‹åŒ–
 
 #if !RATE_CONTROL_LAMBDA_DOMAIN
     if(m_pcCfg->getUseRateCtrl())
@@ -965,7 +965,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
       uiCol     = uiCUAddr % uiWidthInLCUs;
       uiLin     = uiCUAddr / uiWidthInLCUs;
 
-      // ¶à¸öSubStream µÄÉèÖÃ£¬ÔİÊ±ÎŞÓÃ
+      // å¤šä¸ªSubStream çš„è®¾ç½®ï¼Œæš‚æ—¶æ— ç”¨
       if (pcSlice->getPPS()->getNumSubstreams() > 1)
       {
         // independent tiles => substreams are "per tile".  iNumSubstreams has already been multiplied.
@@ -1061,7 +1061,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
 #endif
 
       // run CU encoder
-      m_pcCuEncoder->compressCU( pcCU ); //> ½øĞĞµ±Ç°CUµÄ±àÂë
+      m_pcCuEncoder->compressCU( pcCU ); //> è¿›è¡Œå½“å‰CUçš„ç¼–ç 
 
 #if RATE_CONTROL_LAMBDA_DOMAIN
       if ( m_pcCfg->getUseRateCtrl() )
@@ -1560,7 +1560,7 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
   UInt tileHeightInLcu;
   UInt tileTotalCount;
 
-  // Ä¬ÈÏSlice´óĞ¡ÎªÕû¸öframe
+  // é»˜è®¤Sliceå¤§å°ä¸ºæ•´ä¸ªframe
   uiStartCUAddrSlice        = pcSlice->getSliceCurStartCUAddr();
   UInt uiNumberOfCUsInFrame = rpcPic->getNumCUsInFrame();
   uiBoundingCUAddrSlice     = uiNumberOfCUsInFrame;
@@ -1608,7 +1608,7 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
     }
     pcSlice->setSliceCurEndCUAddr( uiBoundingCUAddrSlice );
   }
-  else //> ·ÇEncodeÊ±ºò
+  else //> éEncodeæ—¶å€™
   {
     UInt uiCUAddrIncrement     ;
     switch (m_pcCfg->getSliceMode())
@@ -1636,9 +1636,9 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
 
       uiBoundingCUAddrSlice    = ((uiStartCUAddrSlice + uiCUAddrIncrement) < uiNumberOfCUsInFrame*rpcPic->getNumPartInCU()) ? (uiStartCUAddrSlice + uiCUAddrIncrement) : uiNumberOfCUsInFrame*rpcPic->getNumPartInCU();
       break;
-    default: //> Ä¿Ç°µÄcfgÒ»°ã²»¶ÔSlice×öÌØÊâµÄÉèÖÃ
-      uiCUAddrIncrement        = rpcPic->getNumCUsInFrame();//> IncrementÒ²Ó¦×¢Òâ
-      uiBoundingCUAddrSlice    = uiNumberOfCUsInFrame*rpcPic->getNumPartInCU(); //> SliceµÄ´óĞ¡µ¥Î»ÒÔ×îĞ¡µÄ4x4µÄCU¿éÎªµ¥Î»£¬¼´ 256(LCUÄÚ4x4¸öÊı)*510(Ö¡ÄÚLCUÊıÄ¿)
+    default: //> ç›®å‰çš„cfgä¸€èˆ¬ä¸å¯¹Sliceåšç‰¹æ®Šçš„è®¾ç½®
+      uiCUAddrIncrement        = rpcPic->getNumCUsInFrame();//> Incrementä¹Ÿåº”æ³¨æ„
+      uiBoundingCUAddrSlice    = uiNumberOfCUsInFrame*rpcPic->getNumPartInCU(); //> Sliceçš„å¤§å°å•ä½ä»¥æœ€å°çš„4x4çš„CUå—ä¸ºå•ä½ï¼Œå³ 256(LCUå†…4x4ä¸ªæ•°)*510(å¸§å†…LCUæ•°ç›®)
       break;
     } 
     // WPP: if a slice does not start at the beginning of a CTB row, it must end within the same CTB row
@@ -1649,7 +1649,7 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
     pcSlice->setSliceCurEndCUAddr( uiBoundingCUAddrSlice );
   }
 
-  //¶à¸öSliceµÄÇé¿ö£¬Ä¿Ç°ÔİÎ´Ö´ĞĞ¹ı
+  //å¤šä¸ªSliceçš„æƒ…å†µï¼Œç›®å‰æš‚æœªæ‰§è¡Œè¿‡
   Bool tileBoundary = false;
   if ((m_pcCfg->getSliceMode() == FIXED_NUMBER_OF_LCU || m_pcCfg->getSliceMode() == FIXED_NUMBER_OF_BYTES) && 
       (m_pcCfg->getNumRowsMinus1() > 0 || m_pcCfg->getNumColumnsMinus1() > 0))
@@ -1673,7 +1673,7 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
     }
   }
 
-  // Dependent slice, ¹ı³ÌÍêÈ«Í¬ÉÏ
+  // Dependent slice, è¿‡ç¨‹å®Œå…¨åŒä¸Š
   UInt startCUAddrSliceSegment, boundingCUAddrSliceSegment;
   startCUAddrSliceSegment    = pcSlice->getSliceSegmentCurStartCUAddr();
   boundingCUAddrSliceSegment = uiNumberOfCUsInFrame;
@@ -1781,7 +1781,7 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
     }
   }
 
-  //½«SliceSegment ËõĞ¡µ½ºÍ SliceµÄBoundingÒ»Ñù´ó
+  //å°†SliceSegment ç¼©å°åˆ°å’Œ Sliceçš„Boundingä¸€æ ·å¤§
   if(boundingCUAddrSliceSegment>uiBoundingCUAddrSlice)
   {
     boundingCUAddrSliceSegment = uiBoundingCUAddrSlice;
@@ -1789,7 +1789,7 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
   }
 
   //calculate real dependent slice start address
-  // ÒÔÏÂ¼ÆËãSliceµÄÆğÊ¼µØÖ·£¬ÆäÖĞÖµÎª¹âÕ¤Ë³Ğò
+  // ä»¥ä¸‹è®¡ç®—Sliceçš„èµ·å§‹åœ°å€ï¼Œå…¶ä¸­å€¼ä¸ºå…‰æ …é¡ºåº
   UInt uiInternalAddress = rpcPic->getPicSym()->getPicSCUAddr(pcSlice->getSliceSegmentCurStartCUAddr()) % rpcPic->getNumPartInCU();
   UInt uiExternalAddress = rpcPic->getPicSym()->getPicSCUAddr(pcSlice->getSliceSegmentCurStartCUAddr()) / rpcPic->getNumPartInCU();
   UInt uiPosX = ( uiExternalAddress % rpcPic->getFrameWidthInCU() ) * g_uiMaxCUWidth+ g_auiRasterToPelX[ g_auiZscanToRaster[uiInternalAddress] ];
@@ -1798,7 +1798,7 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
   UInt uiHeight = pcSlice->getSPS()->getPicHeightInLumaSamples();
   while((uiPosX>=uiWidth||uiPosY>=uiHeight)&&!(uiPosX>=uiWidth&&uiPosY>=uiHeight))
   {
-    // xÓëyµÄÖµ¾ùĞ¡ÓÚwidthºÍheight²ÅĞĞ£¬²»Âú×ãÌõ¼şÊ±ºòµ÷Õû
+    // xä¸yçš„å€¼å‡å°äºwidthå’Œheightæ‰è¡Œï¼Œä¸æ»¡è¶³æ¡ä»¶æ—¶å€™è°ƒæ•´
     uiInternalAddress++;
     if(uiInternalAddress>=rpcPic->getNumPartInCU())
     {
@@ -1808,13 +1808,13 @@ Void TEncSlice::xDetermineStartAndBoundingCUAddr  ( UInt& startCUAddr, UInt& bou
     uiPosX = ( uiExternalAddress % rpcPic->getFrameWidthInCU() ) * g_uiMaxCUWidth+ g_auiRasterToPelX[ g_auiZscanToRaster[uiInternalAddress] ];
     uiPosY = ( uiExternalAddress / rpcPic->getFrameWidthInCU() ) * g_uiMaxCUHeight+ g_auiRasterToPelY[ g_auiZscanToRaster[uiInternalAddress] ];
   }
-  // ÕıÈ·µÄÆğÊ¼µØÖ·£¬µ¥Î»Í¬ÑùÒÔ4x4×îĞ¡CU¡£ÕâÀï»»Ëã»Ø±àÂëË³Ğò(ÓÉ¹âÕ¤Ë³Ğò¶øÀ´)
+  // æ­£ç¡®çš„èµ·å§‹åœ°å€ï¼Œå•ä½åŒæ ·ä»¥4x4æœ€å°CUã€‚è¿™é‡Œæ¢ç®—å›ç¼–ç é¡ºåº(ç”±å…‰æ …é¡ºåºè€Œæ¥)
   UInt uiRealStartAddress = rpcPic->getPicSym()->getPicSCUEncOrder(uiExternalAddress*rpcPic->getNumPartInCU()+uiInternalAddress);
   
   pcSlice->setSliceSegmentCurStartCUAddr(uiRealStartAddress);
   startCUAddrSliceSegment=uiRealStartAddress;
   
-  //calculate real slice start address, »ù±¾Í¬ÉÏ
+  //calculate real slice start address, åŸºæœ¬åŒä¸Š
   uiInternalAddress = rpcPic->getPicSym()->getPicSCUAddr(pcSlice->getSliceCurStartCUAddr()) % rpcPic->getNumPartInCU();
   uiExternalAddress = rpcPic->getPicSym()->getPicSCUAddr(pcSlice->getSliceCurStartCUAddr()) / rpcPic->getNumPartInCU();
   uiPosX = ( uiExternalAddress % rpcPic->getFrameWidthInCU() ) * g_uiMaxCUWidth+ g_auiRasterToPelX[ g_auiZscanToRaster[uiInternalAddress] ];

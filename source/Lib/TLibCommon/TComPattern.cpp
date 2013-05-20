@@ -187,19 +187,19 @@ Void TComPattern::initAdiPattern( TComDataCU* pcCU, UInt uiZorderIdxInPart, UInt
   Int   iUnitSize = 0;
   Int   iNumUnitsInCu = 0;
   Int   iTotalUnits = 0;
-  Bool  bNeighborFlags[4 * MAX_NUM_SPU_W + 1]; //> (ËÄ¸ö·½ÏòÑùµã¿ÉÓÃĞÔ)4 * 128/4 + 1 = 129
-  Int   iNumIntraNeighbor = 0; //> ¸ø¿ÉÓÃÏàÁÚ¿ì¼ÆÊı
+  Bool  bNeighborFlags[4 * MAX_NUM_SPU_W + 1]; //> (å››ä¸ªæ–¹å‘æ ·ç‚¹å¯ç”¨æ€§)4 * 128/4 + 1 = 129
+  Int   iNumIntraNeighbor = 0; //> ç»™å¯ç”¨ç›¸é‚»å¿«è®¡æ•°
   
   UInt uiPartIdxLT, uiPartIdxRT, uiPartIdxLB;
 
-  // ×óÉÏ£¬ÓÒÉÏ£¬×óÏÂ½ÇµÄZOrder,ÒÔ(4x4)¿éÎªµ¥Î»
+  // å·¦ä¸Šï¼Œå³ä¸Šï¼Œå·¦ä¸‹è§’çš„ZOrder,ä»¥(4x4)å—ä¸ºå•ä½
   pcCU->deriveLeftRightTopIdxAdi( uiPartIdxLT, uiPartIdxRT, uiZorderIdxInPart, uiPartDepth );
   pcCU->deriveLeftBottomIdxAdi  ( uiPartIdxLB,              uiZorderIdxInPart, uiPartDepth );
   
-  // »ù±¾µ¥Ôª4x4
+  // åŸºæœ¬å•å…ƒ4x4
   iUnitSize      = g_uiMaxCUWidth >> g_uiMaxCUDepth;
   iNumUnitsInCu  = uiCuWidth / iUnitSize;
-  iTotalUnits    = (iNumUnitsInCu << 2) + 1;//> ×Ü¹²ÓĞ×óÏÂ£¬×ó(iNum *2),  ÉÏ£¬ÓÒÉÏ(iNum*2),×óÉÏ½Ç(1)
+  iTotalUnits    = (iNumUnitsInCu << 2) + 1;//> æ€»å…±æœ‰å·¦ä¸‹ï¼Œå·¦(iNum *2),  ä¸Šï¼Œå³ä¸Š(iNum*2),å·¦ä¸Šè§’(1)
 
   bNeighborFlags[iNumUnitsInCu*2] = isAboveLeftAvailable( pcCU, uiPartIdxLT );
   iNumIntraNeighbor  += (Int)(bNeighborFlags[iNumUnitsInCu*2]);
@@ -211,7 +211,7 @@ Void TComPattern::initAdiPattern( TComDataCU* pcCU, UInt uiZorderIdxInPart, UInt
   bAbove = true;
   bLeft  = true;
 
-  // ×ó±ß64*2,ÉÏ±ß64*2,×óÉÏ1¸ö£¬Ò»¹²ÕâÃ´¶à
+  // å·¦è¾¹64*2,ä¸Šè¾¹64*2,å·¦ä¸Š1ä¸ªï¼Œä¸€å…±è¿™ä¹ˆå¤š
   uiWidth=uiCuWidth2+1;
   uiHeight=uiCuHeight2+1;
   
@@ -220,7 +220,7 @@ Void TComPattern::initAdiPattern( TComDataCU* pcCU, UInt uiZorderIdxInPart, UInt
     return;
   }
   
-  // Ö¸Ïòµ±Ç°PU×óÉÏ½Ç
+  // æŒ‡å‘å½“å‰PUå·¦ä¸Šè§’
   piRoiOrigin = pcCU->getPic()->getPicYuvRec()->getLumaAddr(pcCU->getAddr(), pcCU->getZorderIdxInCU()+uiZorderIdxInPart);
   piAdiTemp   = piAdiBuf;
 
@@ -377,21 +377,21 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
   Int  i, j;
   Int  iDCValue = 1 << (bitDepth - 1);
 
-  if (iNumIntraNeighbor == 0) //> ËùÓĞÑùµã¾ù²»´æÔÚ,Ò»¹² 1+128+128¸öÎ»ÖÃ
+  if (iNumIntraNeighbor == 0) //> æ‰€æœ‰æ ·ç‚¹å‡ä¸å­˜åœ¨,ä¸€å…± 1+128+128ä¸ªä½ç½®
   {
     // Fill border with DC value
-    for (i=0; i<uiWidth; i++) //> ×óÉÏÒ»¿é£¬ÉÏÃæÒ»Ìõ£¬ÓÒÉÏÒ»Ìõ
+    for (i=0; i<uiWidth; i++) //> å·¦ä¸Šä¸€å—ï¼Œä¸Šé¢ä¸€æ¡ï¼Œå³ä¸Šä¸€æ¡
     {
       piAdiTemp[i] = iDCValue;
     }
-    for (i=1; i<uiHeight; i++)//> ×óÒ»Ìõ£¬×óÏÂÒ»Ìõ
+    for (i=1; i<uiHeight; i++)//> å·¦ä¸€æ¡ï¼Œå·¦ä¸‹ä¸€æ¡
     {
       piAdiTemp[i*uiWidth] = iDCValue;
     }
   }
-  else if (iNumIntraNeighbor == iTotalUnits) //> Ñùµã¾ù´æÔÚ
+  else if (iNumIntraNeighbor == iTotalUnits) //> æ ·ç‚¹å‡å­˜åœ¨
   {
-    // Fill top-left border with rec. samples, ×óÉÏÒ»µã
+    // Fill top-left border with rec. samples, å·¦ä¸Šä¸€ç‚¹
     piRoiTemp = piRoiOrigin - iPicStride - 1;
     piAdiTemp[0] = piRoiTemp[0];
 
@@ -403,14 +403,14 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
       piRoiTemp --; // move to the second left column
     }
 
-    for (i=0; i<uiCuHeight; i++) // ×ó±ßÒ»Ìõ
+    for (i=0; i<uiCuHeight; i++) // å·¦è¾¹ä¸€æ¡
     {
       piAdiTemp[(1+i)*uiWidth] = piRoiTemp[0];
       piRoiTemp += iPicStride;
     }
 
     // Fill below left border with rec. samples
-    for (i=0; i<uiCuHeight; i++) // ×óÏÂÒ»Ìõ
+    for (i=0; i<uiCuHeight; i++) // å·¦ä¸‹ä¸€æ¡
     {
       piAdiTemp[(1+uiCuHeight+i)*uiWidth] = piRoiTemp[0];
       piRoiTemp += iPicStride;
@@ -418,14 +418,14 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
 
     // Fill top border with rec. samples
     piRoiTemp = piRoiOrigin - iPicStride;
-    for (i=0; i<uiCuWidth; i++)  // ÉÏ±ßÒ»Ìõ
+    for (i=0; i<uiCuWidth; i++)  // ä¸Šè¾¹ä¸€æ¡
     {
       piAdiTemp[1+i] = piRoiTemp[i];
     }
     
     // Fill top right border with rec. samples
     piRoiTemp = piRoiOrigin - iPicStride + uiCuWidth;
-    for (i=0; i<uiCuWidth; i++)  // ÓÒÉÏÒ»Ìõ
+    for (i=0; i<uiCuWidth; i++)  // å³ä¸Šä¸€æ¡
     {
       piAdiTemp[1+uiCuWidth+i] = piRoiTemp[i];
     }
@@ -433,14 +433,14 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
   else // reference samples are partially available
   {
     Int  iNumUnits2 = iNumUnitsInCu<<1;
-    Int  iTotalSamples = iTotalUnits*iUnitSize; // ËÄ¸ö·½Ïò´¦È¡Ñù×Ü¹²µ¥ÔªÊı,16*4 + 1
+    Int  iTotalSamples = iTotalUnits*iUnitSize; // å››ä¸ªæ–¹å‘å¤„å–æ ·æ€»å…±å•å…ƒæ•°,16*4 + 1
     Pel  piAdiLine[5 * MAX_CU_SIZE];
     Pel  *piAdiLineTemp; 
     Bool *pbNeighborFlags;
     Int  iNext, iCurr;
     Pel  piRef = 0;
 
-    // Initialize, ÒÔDC³õÊ¼»¯
+    // Initialize, ä»¥DCåˆå§‹åŒ–
     for (i=0; i<iTotalSamples; i++)
     {
       piAdiLine[i] = iDCValue;
@@ -448,32 +448,32 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
     
     // Fill top-left sample
     piRoiTemp = piRoiOrigin - iPicStride - 1;
-    piAdiLineTemp = piAdiLine + (iNumUnits2*iUnitSize); //×óÉÏ½Ç¿éµÄÎ»ÖÃ£¬ÒÔÏñËØÎªµ¥Î»£¬Òò´Ë³ËÒÔiUnitSize
-    pbNeighborFlags = bNeighborFlags + iNumUnits2; //×óÉÏ½Ç¿éÊÇ·ñ´æÔÚ,ÒÔUnitÎªµ¥Î»
+    piAdiLineTemp = piAdiLine + (iNumUnits2*iUnitSize); //å·¦ä¸Šè§’å—çš„ä½ç½®ï¼Œä»¥åƒç´ ä¸ºå•ä½ï¼Œå› æ­¤ä¹˜ä»¥iUnitSize
+    pbNeighborFlags = bNeighborFlags + iNumUnits2; //å·¦ä¸Šè§’å—æ˜¯å¦å­˜åœ¨,ä»¥Unitä¸ºå•ä½
     if (*pbNeighborFlags)
     {
-      piAdiLineTemp[0] = piRoiTemp[0]; //È¡ÓÃRecµÄÏñËØÖµ
+      piAdiLineTemp[0] = piRoiTemp[0]; //å–ç”¨Recçš„åƒç´ å€¼
       for (i=1; i<iUnitSize; i++)
       {
-        piAdiLineTemp[i] = piAdiLineTemp[0]; // È¡ÓÃÇ°ÃæÒ»µãµÄÖµ
+        piAdiLineTemp[i] = piAdiLineTemp[0]; // å–ç”¨å‰é¢ä¸€ç‚¹çš„å€¼
       }
     }
 
-    // Fill left & below-left samples£¬Ö»Ìî³ä´æÔÚµÄµãÎªÖØ½¨Í¼ÏñµÄÖµ
+    // Fill left & below-left samplesï¼Œåªå¡«å……å­˜åœ¨çš„ç‚¹ä¸ºé‡å»ºå›¾åƒçš„å€¼
     piRoiTemp += iPicStride;
-    if (bLMmode) // Ò»Ö±ÊÇfalse
+    if (bLMmode) // ä¸€ç›´æ˜¯false
     {
       piRoiTemp --; // move the second left column
     }
     piAdiLineTemp--;
     pbNeighborFlags--;
-    for (j=0; j<iNumUnits2; j++) //×óÏÂ£¬×ó²àÒ»Ò»¼ì²é
+    for (j=0; j<iNumUnits2; j++) //å·¦ä¸‹ï¼Œå·¦ä¾§ä¸€ä¸€æ£€æŸ¥
     {
       if (*pbNeighborFlags)
       {
         for (i=0; i<iUnitSize; i++)
         {
-          piAdiLineTemp[-i] = piRoiTemp[i*iPicStride]; // *(ptr-i) ,4¸öÈ«²¿ÓÃÖØ½¨Í¼ÏñÏñËØ
+          piAdiLineTemp[-i] = piRoiTemp[i*iPicStride]; // *(ptr-i) ,4ä¸ªå…¨éƒ¨ç”¨é‡å»ºå›¾åƒåƒç´ 
         }
       }
       piRoiTemp += iUnitSize*iPicStride;
@@ -481,7 +481,7 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
       pbNeighborFlags--;
     }
 
-    // Fill above & above-right samples£¬Ö»Ìî³ä´æÔÚµÄµãÎªÖØ½¨Í¼ÏñµÄÖµ
+    // Fill above & above-right samplesï¼Œåªå¡«å……å­˜åœ¨çš„ç‚¹ä¸ºé‡å»ºå›¾åƒçš„å€¼
     piRoiTemp = piRoiOrigin - iPicStride;
     piAdiLineTemp = piAdiLine + ((iNumUnits2+1)*iUnitSize);
     pbNeighborFlags = bNeighborFlags + iNumUnits2 + 1;
@@ -503,19 +503,19 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
     iCurr = 0;
     iNext = 1;
     piAdiLineTemp = piAdiLine;
-    while (iCurr < iTotalUnits) // Ò»¸ö¸öµ¥ÔªÑ­»·
+    while (iCurr < iTotalUnits) // ä¸€ä¸ªä¸ªå•å…ƒå¾ªç¯
     {
-      if (!bNeighborFlags[iCurr]) // ´Ëµ¥Ôª²»´æÔÚ
+      if (!bNeighborFlags[iCurr]) // æ­¤å•å…ƒä¸å­˜åœ¨
       {
-        if(iCurr == 0) // µÚÒ»¿é¾Í²»´æÔÚ
+        if(iCurr == 0) // ç¬¬ä¸€å—å°±ä¸å­˜åœ¨
         {
-          while (iNext < iTotalUnits && !bNeighborFlags[iNext])// ÕÒµ½ÊÕ¸ö´æÔÚµÄ
+          while (iNext < iTotalUnits && !bNeighborFlags[iNext])// æ‰¾åˆ°æ”¶ä¸ªå­˜åœ¨çš„
           {
             iNext++; 
           }
-          piRef = piAdiLine[iNext*iUnitSize]; //È¡³ö´Ë¿é
+          piRef = piAdiLine[iNext*iUnitSize]; //å–å‡ºæ­¤å—
           // Pad unavailable samples with new value
-          while (iCurr < iNext) // °Ñ´Ë¿éÇ°ÃæµÄÈ«Ìî³ä³ÉpicRef
+          while (iCurr < iNext) // æŠŠæ­¤å—å‰é¢çš„å…¨å¡«å……æˆpicRef
           {
             for (i=0; i<iUnitSize; i++)
             {
@@ -525,7 +525,7 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
             iCurr++;
           }
         }
-        else // ÓÃÇ°Ò»¿é×îºó¸öÏñËØÌî³ä
+        else // ç”¨å‰ä¸€å—æœ€åä¸ªåƒç´ å¡«å……
         {
           piRef = piAdiLine[iCurr*iUnitSize-1];
           for (i=0; i<iUnitSize; i++)
@@ -545,12 +545,12 @@ Void TComPattern::fillReferenceSamples(Int bitDepth, Pel* piRoiOrigin, Int* piAd
 
     // Copy processed samples
     piAdiLineTemp = piAdiLine + uiHeight + iUnitSize - 2; //> 128 + 3 = 131
-    for (i=0; i<uiWidth; i++) // ×óÉÏ£¬ÉÏ£¬ÓÒÉÏ
+    for (i=0; i<uiWidth; i++) // å·¦ä¸Šï¼Œä¸Šï¼Œå³ä¸Š
     {
       piAdiTemp[i] = piAdiLineTemp[i];
     }
     piAdiLineTemp = piAdiLine + uiHeight - 1; //> 128
-    for (i=1; i<uiHeight; i++) // ×óÏÂ£¬×ó
+    for (i=1; i<uiHeight; i++) // å·¦ä¸‹ï¼Œå·¦
     {
       piAdiTemp[i*uiWidth] = piAdiLineTemp[-i];
     }

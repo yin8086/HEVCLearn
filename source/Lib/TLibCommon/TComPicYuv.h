@@ -113,7 +113,7 @@ public:
   
   /// Stride = Width + ( MarginX * 2) 
   Int   getStride   ()     { return (m_iPicWidth     ) + (m_iLumaMarginX  <<1); }
-  /// 所谓的CStride就是类似Stride，但是对应色度一半的宽度
+  /// 鎵�璋撶殑CStride灏辨槸绫讳技Stride锛屼絾鏄搴旇壊搴︿竴鍗婄殑瀹藉害
   Int   getCStride  ()     { return (m_iPicWidth >> 1) + (m_iChromaMarginX<<1); }
   
   Int   getLumaMargin   () { return m_iLumaMarginX;  }

@@ -52,7 +52,7 @@ namespace po = df::program_options_lite;
 
 int main(int argc, char* argv[])
 {
-  TAppEncTop  cTAppEncTop;   //ºËĞÄ±àÂëÆ÷¶ÔÏó
+  TAppEncTop  cTAppEncTop;   //æ ¸å¿ƒç¼–ç å™¨å¯¹è±¡
 
   // print information
   fprintf( stdout, "\n" );

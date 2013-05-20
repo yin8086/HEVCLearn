@@ -230,7 +230,7 @@ Void TEncCu::init( TEncTop* pcEncTop )
  */
 Void TEncCu::compressCU( TComDataCU*& rpcCU )
 {
-  // initialize CU data£¬µÚ0²ãµÄBest,Tmp CUÖµ½øĞĞ³õÊ¼»¯
+  // initialize CU dataï¼Œç¬¬0å±‚çš„Best,Tmp CUå€¼è¿›è¡Œåˆå§‹åŒ–
   m_ppcBestCU[0]->initCU( rpcCU->getPic(), rpcCU->getAddr() );
   m_ppcTempCU[0]->initCU( rpcCU->getPic(), rpcCU->getAddr() );
 
@@ -366,7 +366,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
 {
   TComPic* pcPic = rpcBestCU->getPic();
 
-  // get Original YUV data from picture£¬²ãÊıÒÔ¼°ZorderºÜÖØÒª
+  // get Original YUV data from pictureï¼Œå±‚æ•°ä»¥åŠZorderå¾ˆé‡è¦
   m_ppcOrigYuv[uiDepth]->copyFromPicYuv( pcPic->getPicYuvOrg(), rpcBestCU->getAddr(), rpcBestCU->getZorderIdxInCU() );
 
   // variables for fast encoder decision
@@ -438,17 +438,17 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
 
   // If slice start or slice end is within this cu...
   TComSlice * pcSlice = rpcTempCU->getPic()->getSlice(rpcTempCU->getPic()->getCurrSliceIdx());
-  // Slice¿ªÊ¼ÊÇ·ñÊÇÔÚCUÄÚ
+  // Sliceå¼€å§‹æ˜¯å¦æ˜¯åœ¨CUå†…
   Bool bSliceStart = pcSlice->getSliceSegmentCurStartCUAddr()>rpcTempCU->getSCUAddr()&&pcSlice->getSliceSegmentCurStartCUAddr()<rpcTempCU->getSCUAddr()+rpcTempCU->getTotalNumPart();
-  // Slice½áÊøÊÇ·ñÊÇÔÚCUÄÚ
+  // Sliceç»“æŸæ˜¯å¦æ˜¯åœ¨CUå†…
   Bool bSliceEnd = (pcSlice->getSliceSegmentCurEndCUAddr()>rpcTempCU->getSCUAddr()&&pcSlice->getSliceSegmentCurEndCUAddr()<rpcTempCU->getSCUAddr()+rpcTempCU->getTotalNumPart());
-  // SliceµÄ±ß½ç´¦CUÊÇ·ñÊÇ²¹ÉÏÀ´µÄ£¨·ÇÕæÊµ¿í¸ß)
+  // Sliceçš„è¾¹ç•Œå¤„CUæ˜¯å¦æ˜¯è¡¥ä¸Šæ¥çš„ï¼ˆéçœŸå®å®½é«˜)
   Bool bInsidePicture = ( uiRPelX < rpcBestCU->getSlice()->getSPS()->getPicWidthInLumaSamples() ) && ( uiBPelY < rpcBestCU->getSlice()->getSPS()->getPicHeightInLumaSamples() );
   // We need to split, so don't try these modes.
   if(!bSliceEnd && !bSliceStart && bInsidePicture )
   {
-    // ĞèÒªÇĞ·Ö
-    for (Int iQP=iMinQP; iQP<=iMaxQP; iQP++) //> Ö»½øĞĞÁËinterÄ£Ê½µÄÌáÇ°´¦Àí
+    // éœ€è¦åˆ‡åˆ†
+    for (Int iQP=iMinQP; iQP<=iMaxQP; iQP++) //> åªè¿›è¡Œäº†interæ¨¡å¼çš„æå‰å¤„ç†
     {
       if (isAddLowestQP && (iQP == iMinQP))
       {
@@ -459,7 +459,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
       bTrySplit    = true;
       fRD_Skip    = MAX_DOUBLE;
 
-      rpcTempCU->initEstData( uiDepth, iQP ); // ÎªÀïÃæ256¸ö4x4CUÉèÖÃ³õÖµ
+      rpcTempCU->initEstData( uiDepth, iQP ); // ä¸ºé‡Œé¢256ä¸ª4x4CUè®¾ç½®åˆå€¼
 
       // do inter modes, SKIP and 2Nx2N
       if( rpcBestCU->getSlice()->getSliceType() != I_SLICE )
@@ -523,7 +523,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
     }
 #endif
 
-    if(!earlyDetectionSkipMode) //> ÕıÊ½¿ªÊ¼½øĞĞ·ÖÎö
+    if(!earlyDetectionSkipMode) //> æ­£å¼å¼€å§‹è¿›è¡Œåˆ†æ
     {
       for (Int iQP=iMinQP; iQP<=iMaxQP; iQP++)
       {
@@ -531,10 +531,10 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
         {
           iQP = lowestQP;
         }
-        rpcTempCU->initEstData( uiDepth, iQP );// ½øĞĞ¹À¼ÆµÄ³õÊ¼»¯£¬Í¬ÉÏÃæ
+        rpcTempCU->initEstData( uiDepth, iQP );// è¿›è¡Œä¼°è®¡çš„åˆå§‹åŒ–ï¼ŒåŒä¸Šé¢
 
         // do inter modes, NxN, 2NxN, and Nx2N 
-        // ÏÈ²»¹ÜÖ¡¼ä±àÂë
+        // å…ˆä¸ç®¡å¸§é—´ç¼–ç 
         if( rpcBestCU->getSlice()->getSliceType() != I_SLICE )
         {
           // 2Nx2N, NxN
@@ -694,7 +694,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
             rpcBestCU->getCbf( 0, TEXT_CHROMA_U ) != 0   ||
             rpcBestCU->getCbf( 0, TEXT_CHROMA_V ) != 0     ) // avoid very complex intra if it is unlikely
           {
-            xCheckRDCostIntra( rpcBestCU, rpcTempCU, SIZE_2Nx2N ); //> ¿ªÊ¼½øĞĞRDµÄCost·ÖÎö
+            xCheckRDCostIntra( rpcBestCU, rpcTempCU, SIZE_2Nx2N ); //> å¼€å§‹è¿›è¡ŒRDçš„Coståˆ†æ
             rpcTempCU->initEstData( uiDepth, iQP );
             if( uiDepth == g_uiMaxCUDepth - g_uiAddCUDepth )
             {
@@ -1362,7 +1362,7 @@ Void TEncCu::xCheckRDCostIntra( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, 
 {
   UInt uiDepth = rpcTempCU->getDepth( 0 );
   
-  // ÈÔÈ»ÊÇ¸ù¾İ²ãÊıÉèÖÃÒ»Ğ©³õÊ¼²ÎÊı
+  // ä»ç„¶æ˜¯æ ¹æ®å±‚æ•°è®¾ç½®ä¸€äº›åˆå§‹å‚æ•°
   rpcTempCU->setSkipFlagSubParts( false, 0, uiDepth );
 
   rpcTempCU->setPartSizeSubParts( eSize, 0, uiDepth );
@@ -1376,7 +1376,7 @@ Void TEncCu::xCheckRDCostIntra( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, 
     m_pcPredSearch->preestChromaPredMode( rpcTempCU, m_ppcOrigYuv[uiDepth], m_ppcPredYuvTemp[uiDepth] );
   }
 
-  // ºËĞÄ²¿·Ö¡ª¡ª½øĞĞÁÁ¶È·ÖÁ¿µÄÖ¡ÄÚÔ¤²â
+  // æ ¸å¿ƒéƒ¨åˆ†â€”â€”è¿›è¡Œäº®åº¦åˆ†é‡çš„å¸§å†…é¢„æµ‹
   m_pcPredSearch  ->estIntraPredQT      ( rpcTempCU, m_ppcOrigYuv[uiDepth], m_ppcPredYuvTemp[uiDepth], m_ppcResiYuvTemp[uiDepth], m_ppcRecoYuvTemp[uiDepth], uiPreCalcDistC, bSeparateLumaChroma );
 
   m_ppcRecoYuvTemp[uiDepth]->copyToPicLuma(rpcTempCU->getPic()->getPicYuvRec(), rpcTempCU->getAddr(), rpcTempCU->getZorderIdxInCU() );
