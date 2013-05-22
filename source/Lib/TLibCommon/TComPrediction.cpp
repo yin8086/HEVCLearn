@@ -335,12 +335,13 @@ Void TComPrediction::predIntraLumaAng(TComPattern* pcTComPattern, UInt uiDirMode
 
   assert( g_aucConvertToBit[ iWidth ] >= 0 ); //   4x  4
   assert( g_aucConvertToBit[ iWidth ] <= 5 ); // 128x128
-  assert( iWidth == iHeight  );
+  assert( iWidth == iHeight  ); // 保证PU为方形
 
+  // log2，所以加2相当于乘以4，正好 g[x] = log2(x/4)
   ptrSrc = pcTComPattern->getPredictorPtr( uiDirMode, g_aucConvertToBit[ iWidth ] + 2, m_piYuvExt );
 
-  // get starting pixel in block
-  Int sw = 2 * iWidth + 1;
+  // get starting pixel in block，ptrSrc指向的实际上是 (CUHeight2 + 1)*(CUWidth2 +1)大小的矩形
+  Int sw = 2 * iWidth + 1; //这里从(-1,-1)位置处，到(0,0)位置处，即到达当前PU左上角
 
   // Create the prediction
   if ( uiDirMode == PLANAR_IDX )

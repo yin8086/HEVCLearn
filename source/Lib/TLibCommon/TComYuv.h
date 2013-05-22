@@ -82,8 +82,8 @@ private:
 
   static Int getAddrOffset( UInt iTransUnitIdx, UInt iBlkSize, UInt width )
   {
-    Int blkX = ( iTransUnitIdx * iBlkSize ) &  ( width - 1 );
-    Int blkY = ( iTransUnitIdx * iBlkSize ) &~ ( width - 1 );
+    Int blkX = ( iTransUnitIdx * iBlkSize ) &  ( width - 1 ); // X = (PUWidth * idx) % CUWidth
+    Int blkY = ( iTransUnitIdx * iBlkSize ) &~ ( width - 1 ); // Y = (PUWidth * idx) / CUWidth
     
     return blkX + blkY * iBlkSize;
   }

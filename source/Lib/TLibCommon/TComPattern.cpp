@@ -46,6 +46,7 @@
 // Tables
 // ====================================================================================================================
 
+// 这个叫做intraHorVerDistThres，阙值
 const UChar TComPattern::m_aucIntraFilter[5] =
 {
   10, //4x4
@@ -196,7 +197,7 @@ Void TComPattern::initAdiPattern( TComDataCU* pcCU, UInt uiZorderIdxInPart, UInt
   pcCU->deriveLeftRightTopIdxAdi( uiPartIdxLT, uiPartIdxRT, uiZorderIdxInPart, uiPartDepth );
   pcCU->deriveLeftBottomIdxAdi  ( uiPartIdxLB,              uiZorderIdxInPart, uiPartDepth );
   
-  // 基本单元4x4
+  // 基本单元4x4 
   iUnitSize      = g_uiMaxCUWidth >> g_uiMaxCUDepth;
   iNumUnitsInCu  = uiCuWidth / iUnitSize;
   iTotalUnits    = (iNumUnitsInCu << 2) + 1;//> 总共有左下，左(iNum *2),  上，右上(iNum*2),左上角(1)
@@ -212,8 +213,8 @@ Void TComPattern::initAdiPattern( TComDataCU* pcCU, UInt uiZorderIdxInPart, UInt
   bLeft  = true;
 
   // 左边64*2,上边64*2,左上1个，一共这么多
-  uiWidth=uiCuWidth2+1;
-  uiHeight=uiCuHeight2+1;
+  uiWidth=uiCuWidth2+1; //129
+  uiHeight=uiCuHeight2+1; // 129
   
   if (((uiWidth<<2)>iOrgBufStride)||((uiHeight<<2)>iOrgBufHeight))
   {
@@ -228,18 +229,23 @@ Void TComPattern::initAdiPattern( TComDataCU* pcCU, UInt uiZorderIdxInPart, UInt
   
   Int   i;
   // generate filtered intra prediction samples
+  
+  // 单位为像素LCU时候为128+128+1
   Int iBufSize = uiCuHeight2 + uiCuWidth2 + 1;  // left and left above border + above and above right border + top left corner = length of 3. filter buffer
 
   UInt uiWH = uiWidth * uiHeight;               // number of elements in one buffer
 
+  //先是值复制到一维数组Buf中，在滤波后放入一维数组BufN中，最后复制回二维数组Buf1
   Int* piFilteredBuf1 = piAdiBuf + uiWH;        // 1. filter buffer
   Int* piFilteredBuf2 = piFilteredBuf1 + uiWH;  // 2. filter buffer
   Int* piFilterBuf = piFilteredBuf2 + uiWH;     // buffer for 2. filtering (sequential)
   Int* piFilterBufN = piFilterBuf + iBufSize;   // buffer for 1. filtering (sequential)
 
+  
+  // 下面是将piAdiBuf中经fillRe填充后未滤波的值拷贝入pdFilterBuf
   Int l = 0;
   // left border from bottom to top
-  for (i = 0; i < uiCuHeight2; i++)
+  for (i = 0; i < uiCuHeight2; i++) 
   {
     piFilterBuf[l++] = piAdiTemp[uiWidth * (uiCuHeight2 - i)];
   }
@@ -251,35 +257,41 @@ Void TComPattern::initAdiPattern( TComDataCU* pcCU, UInt uiZorderIdxInPart, UInt
     piFilterBuf[l++] = piAdiTemp[1 + i];
   }
 
+  //Strong Intra Smoothing
   if (pcCU->getSlice()->getSPS()->getUseStrongIntraSmoothing())
   {
     Int blkSize = 32;
-    Int bottomLeft = piFilterBuf[0];
+    Int bottomLeft = piFilterBuf[0]; //顺序还是标准的左下开始顺时针
     Int topLeft = piFilterBuf[uiCuHeight2];
     Int topRight = piFilterBuf[iBufSize-1];
     Int threshold = 1 << (g_bitDepthY - 5);
+
+    // 左边垂直边还有上边水平边 两端点之和与中值2倍之间的差与一个阙值对比
     Bool bilinearLeft = abs(bottomLeft+topLeft-2*piFilterBuf[uiCuHeight]) < threshold;
     Bool bilinearAbove  = abs(topLeft+topRight-2*piFilterBuf[uiCuHeight2+uiCuHeight]) < threshold;
   
-    if (uiCuWidth>=blkSize && (bilinearLeft && bilinearAbove))
+    //Strong 设置为真，且满足阙值，才会进行强滤波，否则仍是[1,2,1]
+    if (uiCuWidth>=blkSize && (bilinearLeft && bilinearAbove))//>=32且小于阙值
     {
       Int shift = g_aucConvertToBit[uiCuWidth] + 3;  // log2(uiCuHeight2)
-      piFilterBufN[0] = piFilterBuf[0];
-      piFilterBufN[uiCuHeight2] = piFilterBuf[uiCuHeight2];
-      piFilterBufN[iBufSize - 1] = piFilterBuf[iBufSize - 1];
-      for (i = 1; i < uiCuHeight2; i++)
+      piFilterBufN[0] = piFilterBuf[0]; //左下
+      piFilterBufN[uiCuHeight2] = piFilterBuf[uiCuHeight2]; // 左上
+      piFilterBufN[iBufSize - 1] = piFilterBuf[iBufSize - 1]; // 右上
+      
+      // 实际上是由所在边两个端点，利用位置索引的加权计算出来的
+      for (i = 1; i < uiCuHeight2; i++) // 左边，从底到上
       {
         piFilterBufN[i] = ((uiCuHeight2-i)*bottomLeft + i*topLeft + uiCuHeight) >> shift;
       }
   
-      for (i = 1; i < uiCuWidth2; i++)
+      for (i = 1; i < uiCuWidth2; i++) // 右边，从左到右
       {
         piFilterBufN[uiCuHeight2 + i] = ((uiCuWidth2-i)*topLeft + i*topRight + uiCuWidth) >> shift;
       }
     }
     else 
     {
-      // 1. filtering with [1 2 1]
+      // 1. filtering with [1 2 1]， 由周围包括自己3个值加权得到
       piFilterBufN[0] = piFilterBuf[0];
       piFilterBufN[iBufSize - 1] = piFilterBuf[iBufSize - 1];
       for (i = 1; i < iBufSize - 1; i++)
@@ -290,7 +302,7 @@ Void TComPattern::initAdiPattern( TComDataCU* pcCU, UInt uiZorderIdxInPart, UInt
   }
   else 
   {
-    // 1. filtering with [1 2 1]
+    // 1. filtering with [1 2 1]， 由周围包括自己3个值加权得到
     piFilterBufN[0] = piFilterBuf[0];
     piFilterBufN[iBufSize - 1] = piFilterBuf[iBufSize - 1];
     for (i = 1; i < iBufSize - 1; i++)
@@ -299,7 +311,7 @@ Void TComPattern::initAdiPattern( TComDataCU* pcCU, UInt uiZorderIdxInPart, UInt
     }
   }
 
-  // fill 1. filter buffer with filtered values
+  // fill 1. filter buffer with filtered values，将一维数组值拷贝回对应二维数组
   l=0;
   for (i = 0; i < uiCuHeight2; i++)
   {
@@ -584,8 +596,8 @@ Int* TComPattern::getPredictorPtr( UInt uiDirMode, UInt log2BlkSize, Int* piAdiB
 {
   Int* piSrc;
   assert(log2BlkSize >= 2 && log2BlkSize < 7);
-  Int diff = min<Int>(abs((Int) uiDirMode - HOR_IDX), abs((Int)uiDirMode - VER_IDX));
-  UChar ucFiltIdx = diff > m_aucIntraFilter[log2BlkSize - 2] ? 1 : 0;
+  Int diff = min<Int>(abs((Int) uiDirMode - HOR_IDX), abs((Int)uiDirMode - VER_IDX));// 看看离那个模式近
+  UChar ucFiltIdx = diff > m_aucIntraFilter[log2BlkSize - 2] ? 1 : 0; //根据PU大小去对比阙值
   if (uiDirMode == DC_IDX)
   {
     ucFiltIdx = 0; //no smoothing for DC or LM chroma
@@ -598,7 +610,7 @@ Int* TComPattern::getPredictorPtr( UInt uiDirMode, UInt log2BlkSize, Int* piAdiB
   
   piSrc = getAdiOrgBuf( width, height, piAdiBuf );
 
-  if ( ucFiltIdx )
+  if ( ucFiltIdx ) //确定进行滤波则进入Buf1,否则则为原始的Buf
   {
     piSrc += (2 * width + 1) * (2 * height + 1);
   }

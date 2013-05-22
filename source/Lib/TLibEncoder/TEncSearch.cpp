@@ -2466,6 +2466,7 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
     Bool bAboveAvail = false;
     Bool bLeftAvail  = false;
     pcCU->getPattern()->initPattern   ( pcCU, uiInitTrDepth, uiPartOffset );
+    // 顺利完成包括参考样点值填充以及滤波
     pcCU->getPattern()->initAdiPattern( pcCU, uiPartOffset, uiInitTrDepth, m_piYuvExt, m_iYuvExtStride, m_iYuvExtHeight, bAboveAvail, bLeftAvail );
     
     //===== determine set of modes to be tested (using prediction signal only) =====
@@ -2474,14 +2475,14 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
     Pel* piPred        = pcPredYuv->getLumaAddr( uiPU, uiWidth );
     UInt uiStride      = pcPredYuv->getStride();
     UInt uiRdModeList[FAST_UDI_MAX_RDMODE_NUM];
-    Int numModesForFullRD = g_aucIntraModeNumFast[ uiWidthBit ];
+    Int numModesForFullRD = g_aucIntraModeNumFast[ uiWidthBit ]; //根据PU大小选取最可能的模式个数
     
-    Bool doFastSearch = (numModesForFullRD != numModesAvailable);
+    Bool doFastSearch = (numModesForFullRD != numModesAvailable); //由MPM存在就进行快速搜索
     if (doFastSearch)
     {
       assert(numModesForFullRD < numModesAvailable);
 
-      for( Int i=0; i < numModesForFullRD; i++ ) 
+      for( Int i=0; i < numModesForFullRD; i++ ) //初始化RDCost
       {
         CandCostList[ i ] = MAX_DOUBLE;
       }
