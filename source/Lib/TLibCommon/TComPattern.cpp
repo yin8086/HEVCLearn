@@ -245,7 +245,7 @@ Void TComPattern::initAdiPattern( TComDataCU* pcCU, UInt uiZorderIdxInPart, UInt
   // 下面是将piAdiBuf中经fillRe填充后未滤波的值拷贝入pdFilterBuf
   Int l = 0;
   // left border from bottom to top
-  for (i = 0; i < uiCuHeight2; i++) 
+  for (i = 0; i < uiCuHeight2; i++)
   {
     piFilterBuf[l++] = piAdiTemp[uiWidth * (uiCuHeight2 - i)];
   }

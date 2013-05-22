@@ -1,38 +1,38 @@
 /* The copyright in this software is being made available under the BSD
-* License, included below. This software may be subject to other third party
-* and contributor rights, including patent rights, and no such rights are
-* granted under this license.  
-*
-* Copyright (c) 2010-2013, ITU/ISO/IEC
-* All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following conditions are met:
-*
-*  * Redistributions of source code must retain the above copyright notice,
-*    this list of conditions and the following disclaimer.
-*  * Redistributions in binary form must reproduce the above copyright notice,
-*    this list of conditions and the following disclaimer in the documentation
-*    and/or other materials provided with the distribution.
-*  * Neither the name of the ITU/ISO/IEC nor the names of its contributors may
-*    be used to endorse or promote products derived from this software without
-*    specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-* AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-* IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-* ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
-* BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-* CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-* SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-* INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-* CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-* ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
-* THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ * License, included below. This software may be subject to other third party
+ * and contributor rights, including patent rights, and no such rights are
+ * granted under this license.  
+ *
+ * Copyright (c) 2010-2013, ITU/ISO/IEC
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *  * Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *  * Neither the name of the ITU/ISO/IEC nor the names of its contributors may
+ *    be used to endorse or promote products derived from this software without
+ *    specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 /** \file     TAppEncTop.cpp
-\brief    Encoder application class
+    \brief    Encoder application class
 */
 
 #include <list>
@@ -68,7 +68,7 @@ TAppEncTop::~TAppEncTop()
 Void TAppEncTop::xInitLibCfg()
 {
   TComVPS vps;
-
+  
   vps.setMaxTLayers                       ( m_maxTempLayer );
   if (m_maxTempLayer == 1)
   {
@@ -90,14 +90,14 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setNonPackedConstraintFlag(m_nonPackedConstraintFlag);
   m_cTEncTop.setFrameOnlyConstraintFlag(m_frameOnlyConstraintFlag);
 #endif
-
+  
   m_cTEncTop.setFrameRate                    ( m_iFrameRate );
   m_cTEncTop.setFrameSkip                    ( m_FrameSkip );
   m_cTEncTop.setSourceWidth                  ( m_iSourceWidth );
   m_cTEncTop.setSourceHeight                 ( m_iSourceHeight );
   m_cTEncTop.setConformanceWindow            ( m_confLeft, m_confRight, m_confTop, m_confBottom );
   m_cTEncTop.setFramesToBeEncoded            ( m_framesToBeEncoded );
-
+  
   //====== Coding Structure ========
   m_cTEncTop.setIntraPeriod                  ( m_iIntraPeriod );
   m_cTEncTop.setDecodingRefreshType          ( m_iDecodingRefreshType );
@@ -114,20 +114,23 @@ Void TAppEncTop::xInitLibCfg()
     m_cTEncTop.setLambdaModifier( uiLoop, m_adLambdaModifier[ uiLoop ] );
   }
   m_cTEncTop.setQP                           ( m_iQP );
-
+  
   m_cTEncTop.setPad                          ( m_aiPad );
-
+    
   m_cTEncTop.setMaxTempLayer                 ( m_maxTempLayer );
   m_cTEncTop.setUseAMP( m_enableAMP );
-
+  
   //===== Slice ========
-
+  
   //====== Loop/Deblock Filter ========
   m_cTEncTop.setLoopFilterDisable            ( m_bLoopFilterDisable       );
   m_cTEncTop.setLoopFilterOffsetInPPS        ( m_loopFilterOffsetInPPS );
   m_cTEncTop.setLoopFilterBetaOffset         ( m_loopFilterBetaOffsetDiv2  );
   m_cTEncTop.setLoopFilterTcOffset           ( m_loopFilterTcOffsetDiv2    );
   m_cTEncTop.setDeblockingFilterControlPresent( m_DeblockingFilterControlPresent);
+#if L0386_DB_METRIC
+  m_cTEncTop.setDeblockingFilterMetric       ( m_DeblockingFilterMetric );
+#endif
 
   //====== Motion search ========
   m_cTEncTop.setFastSearch                   ( m_iFastSearch  );
@@ -154,14 +157,16 @@ Void TAppEncTop::xInitLibCfg()
   }
   m_cTEncTop.setUseAdaptiveQP                ( m_bUseAdaptiveQP  );
   m_cTEncTop.setQPAdaptationRange            ( m_iQPAdaptationRange );
-
+  
   //====== Tool list ========
   m_cTEncTop.setUseSBACRD                    ( m_bUseSBACRD   );
   m_cTEncTop.setDeltaQpRD                    ( m_uiDeltaQpRD  );
   m_cTEncTop.setUseASR                       ( m_bUseASR      );
   m_cTEncTop.setUseHADME                     ( m_bUseHADME    );
   m_cTEncTop.setUseLossless                  ( m_useLossless );
+#if !L0034_COMBINED_LIST_CLEANUP
   m_cTEncTop.setUseLComb                     ( m_bUseLComb    );
+#endif
   m_cTEncTop.setdQPs                         ( m_aidQP        );
   m_cTEncTop.setUseRDOQ                      ( m_useRDOQ     );
   m_cTEncTop.setUseRDOQTS                    ( m_useRDOQTS   );
@@ -185,7 +190,7 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setUsePCM                       ( m_usePCM );
   m_cTEncTop.setPCMLog2MaxSize               ( m_pcmLog2MaxSize);
   m_cTEncTop.setMaxNumMergeCand              ( m_maxNumMergeCand );
-
+  
 
   //====== Weighted Prediction ========
   m_cTEncTop.setUseWP                   ( m_useWeightedPred      );
@@ -213,7 +218,7 @@ Void TAppEncTop::xInitLibCfg()
   {
     m_cTEncTop.setSliceArgument ( m_sliceArgument );
   }
-
+  
   if(m_sliceMode == 0 )
   {
     m_bLFCrossSliceBoundaryFlag = true;
@@ -231,6 +236,33 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setRecoveryPointSEIEnabled( m_recoveryPointSEIEnabled );
   m_cTEncTop.setBufferingPeriodSEIEnabled( m_bufferingPeriodSEIEnabled );
   m_cTEncTop.setPictureTimingSEIEnabled( m_pictureTimingSEIEnabled );
+#if J0149_TONE_MAPPING_SEI
+  m_cTEncTop.setToneMappingInfoSEIEnabled                 ( m_toneMappingInfoSEIEnabled );
+  m_cTEncTop.setTMISEIToneMapId                           ( m_toneMapId );
+  m_cTEncTop.setTMISEIToneMapCancelFlag                   ( m_toneMapCancelFlag );
+  m_cTEncTop.setTMISEIToneMapPersistenceFlag              ( m_toneMapPersistenceFlag );
+  m_cTEncTop.setTMISEICodedDataBitDepth                   ( m_toneMapCodedDataBitDepth );
+  m_cTEncTop.setTMISEITargetBitDepth                      ( m_toneMapTargetBitDepth );
+  m_cTEncTop.setTMISEIModelID                             ( m_toneMapModelId );
+  m_cTEncTop.setTMISEIMinValue                            ( m_toneMapMinValue );
+  m_cTEncTop.setTMISEIMaxValue                            ( m_toneMapMaxValue );
+  m_cTEncTop.setTMISEISigmoidMidpoint                     ( m_sigmoidMidpoint );
+  m_cTEncTop.setTMISEISigmoidWidth                        ( m_sigmoidWidth );
+  m_cTEncTop.setTMISEIStartOfCodedInterva                 ( m_startOfCodedInterval );
+  m_cTEncTop.setTMISEINumPivots                           ( m_numPivots );
+  m_cTEncTop.setTMISEICodedPivotValue                     ( m_codedPivotValue );
+  m_cTEncTop.setTMISEITargetPivotValue                    ( m_targetPivotValue );
+  m_cTEncTop.setTMISEICameraIsoSpeedIdc                   ( m_cameraIsoSpeedIdc );
+  m_cTEncTop.setTMISEICameraIsoSpeedValue                 ( m_cameraIsoSpeedValue );
+  m_cTEncTop.setTMISEIExposureCompensationValueSignFlag   ( m_exposureCompensationValueSignFlag );
+  m_cTEncTop.setTMISEIExposureCompensationValueNumerator  ( m_exposureCompensationValueNumerator );
+  m_cTEncTop.setTMISEIExposureCompensationValueDenomIdc   ( m_exposureCompensationValueDenomIdc );
+  m_cTEncTop.setTMISEIRefScreenLuminanceWhite             ( m_refScreenLuminanceWhite );
+  m_cTEncTop.setTMISEIExtendedRangeWhiteLevel             ( m_extendedRangeWhiteLevel );
+  m_cTEncTop.setTMISEINominalBlackLevelLumaCodeValue      ( m_nominalBlackLevelLumaCodeValue );
+  m_cTEncTop.setTMISEINominalWhiteLevelLumaCodeValue      ( m_nominalWhiteLevelLumaCodeValue );
+  m_cTEncTop.setTMISEIExtendedWhiteLevelLumaCodeValue     ( m_extendedWhiteLevelLumaCodeValue );
+#endif
   m_cTEncTop.setFramePackingArrangementSEIEnabled( m_framePackingSEIEnabled );
   m_cTEncTop.setFramePackingArrangementSEIType( m_framePackingSEIType );
   m_cTEncTop.setFramePackingArrangementSEIId( m_framePackingSEIId );
@@ -240,6 +272,12 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setTemporalLevel0IndexSEIEnabled( m_temporalLevel0IndexSEIEnabled );
   m_cTEncTop.setGradualDecodingRefreshInfoEnabled( m_gradualDecodingRefreshInfoEnabled );
   m_cTEncTop.setDecodingUnitInfoSEIEnabled( m_decodingUnitInfoSEIEnabled );
+#if L0208_SOP_DESCRIPTION_SEI
+  m_cTEncTop.setSOPDescriptionSEIEnabled( m_SOPDescriptionSEIEnabled );
+#endif
+#if K0180_SCALABLE_NESTING_SEI
+  m_cTEncTop.setScalableNestingSEIEnabled( m_scalableNestingSEIEnabled );
+#endif
   m_cTEncTop.setUniformSpacingIdr          ( m_iUniformSpacingIdr );
   m_cTEncTop.setNumColumnsMinus1           ( m_iNumColumnsMinus1 );
   m_cTEncTop.setNumRowsMinus1              ( m_iNumRowsMinus1 );
@@ -344,7 +382,7 @@ Void TAppEncTop::xCreateLib()
 
   if (m_pchReconFile)
     m_cTVideoIOYuvReconFile.open(m_pchReconFile, true, m_outputBitDepthY, m_outputBitDepthC, m_internalBitDepthY, m_internalBitDepthC);  // write mode
-
+  
   // Neo Decoder
   m_cTEncTop.create();
 }
@@ -354,7 +392,7 @@ Void TAppEncTop::xDestroyLib()
   // Video I/O
   m_cTVideoIOYuvInputFile.close();
   m_cTVideoIOYuvReconFile.close();
-
+  
   // Neo Decoder
   m_cTEncTop.destroy();
 }
@@ -369,13 +407,13 @@ Void TAppEncTop::xInitLib()
 // ====================================================================================================================
 
 /**
-- create internal class
-- initialize internal variable
-- until the end of input YUV file, call encoding function in TEncTop class
-- delete allocated buffers
-- destroy internal class
-.
-*/
+ - create internal class
+ - initialize internal variable
+ - until the end of input YUV file, call encoding function in TEncTop class
+ - delete allocated buffers
+ - destroy internal class
+ .
+ */
 Void TAppEncTop::encode()
 {
   fstream bitstreamFile(m_pchBitstreamFile, fstream::binary | fstream::out);
@@ -387,21 +425,21 @@ Void TAppEncTop::encode()
 
   TComPicYuv*       pcPicYuvOrg = new TComPicYuv;
   TComPicYuv*       pcPicYuvRec = NULL;
-
+  
   // initialize internal class & member variables
   xInitLibCfg();
   xCreateLib();
   xInitLib();
-
+  
   // main encoder loop
   Int   iNumEncoded = 0;
   Bool  bEos = false;
-
+  
   list<AccessUnit> outputAccessUnits; ///< list of access units to write out.  is populated by the encoding process
 
   // allocate original YUV buffer
   pcPicYuvOrg->create( m_iSourceWidth, m_iSourceHeight, m_uiMaxCUWidth, m_uiMaxCUHeight, m_uiMaxCUDepth );
-
+  
   while ( !bEos )
   {
     // get buffers
@@ -409,10 +447,10 @@ Void TAppEncTop::encode()
 
     // read input YUV file,放入 buffer 中
     m_cTVideoIOYuvInputFile.read( pcPicYuvOrg, m_aiPad );
-
+    
     // increase number of received frames
     m_iFrameRcvd++;
-
+    
     bEos = (m_iFrameRcvd == m_framesToBeEncoded);
 
     Bool flush = 0;
@@ -427,7 +465,7 @@ Void TAppEncTop::encode()
 
     // call encoding function for one frame
     m_cTEncTop.encode( bEos, flush ? 0 : pcPicYuvOrg, m_cListPicYuvRec, outputAccessUnits, iNumEncoded );
-
+    
     // write bistream to file if necessary
     if ( iNumEncoded > 0 )
     {
@@ -442,14 +480,14 @@ Void TAppEncTop::encode()
   pcPicYuvOrg->destroy();
   delete pcPicYuvOrg;
   pcPicYuvOrg = NULL;
-
+  
   // delete used buffers in encoder class
   m_cTEncTop.deletePicBuffer();
-
+  
   // delete buffers & classes
   xDeleteBuffer();
   xDestroyLib();
-
+  
   printRateSummary();
 
   return;
@@ -460,15 +498,15 @@ Void TAppEncTop::encode()
 // ====================================================================================================================
 
 /**
-- application has picture buffer list with size of GOP
-- picture buffer list acts as ring buffer
-- end of the list has the latest picture
-.
-*/
+ - application has picture buffer list with size of GOP
+ - picture buffer list acts as ring buffer
+ - end of the list has the latest picture
+ .
+ */
 Void TAppEncTop::xGetBuffer( TComPicYuv*& rpcPicYuvRec)
 {
   assert( m_iGOPSize > 0 );
-
+  
   // org. buffer
   // 查看图像buffer里面的的图像是否已经放满
   if ( m_cListPicYuvRec.size() == (UInt)m_iGOPSize )
@@ -481,7 +519,7 @@ Void TAppEncTop::xGetBuffer( TComPicYuv*& rpcPicYuvRec)
   {
     // 非full则创建新的
     rpcPicYuvRec = new TComPicYuv;
-
+    
     rpcPicYuvRec->create( m_iSourceWidth, m_iSourceHeight, m_uiMaxCUWidth, m_uiMaxCUHeight, m_uiMaxCUDepth );
 
   }
@@ -492,32 +530,32 @@ Void TAppEncTop::xGetBuffer( TComPicYuv*& rpcPicYuvRec)
 Void TAppEncTop::xDeleteBuffer( )
 {
   TComList<TComPicYuv*>::iterator iterPicYuvRec  = m_cListPicYuvRec.begin();
-
+  
   Int iSize = Int( m_cListPicYuvRec.size() );
-
+  
   for ( Int i = 0; i < iSize; i++ )
   {
     TComPicYuv*  pcPicYuvRec  = *(iterPicYuvRec++);
     pcPicYuvRec->destroy();
     delete pcPicYuvRec; pcPicYuvRec = NULL;
   }
-
+  
 }
 
 /** \param iNumEncoded  number of encoded frames
-*/
+ */
 Void TAppEncTop::xWriteOutput(std::ostream& bitstreamFile, Int iNumEncoded, const std::list<AccessUnit>& accessUnits)
 {
   Int i;
-
+  
   TComList<TComPicYuv*>::iterator iterPicYuvRec = m_cListPicYuvRec.end();
   list<AccessUnit>::const_iterator iterBitstream = accessUnits.begin();
-
+  
   for ( i = 0; i < iNumEncoded; i++ )
   {
     --iterPicYuvRec;
   }
-
+  
   for ( i = 0; i < iNumEncoded; i++ )
   {
     TComPicYuv*  pcPicYuvRec  = *(iterPicYuvRec++);
@@ -533,8 +571,8 @@ Void TAppEncTop::xWriteOutput(std::ostream& bitstreamFile, Int iNumEncoded, cons
 }
 
 /**
-*
-*/
+ *
+ */
 void TAppEncTop::rateStatsAccum(const AccessUnit& au, const std::vector<UInt>& annexBsizes)
 {
   AccessUnit::const_iterator it_au = au.begin();
@@ -546,20 +584,20 @@ void TAppEncTop::rateStatsAccum(const AccessUnit& au, const std::vector<UInt>& a
     {
     case NAL_UNIT_CODED_SLICE_TRAIL_R:
     case NAL_UNIT_CODED_SLICE_TRAIL_N:
-    case NAL_UNIT_CODED_SLICE_TLA:
+    case NAL_UNIT_CODED_SLICE_TLA_R:
     case NAL_UNIT_CODED_SLICE_TSA_N:
     case NAL_UNIT_CODED_SLICE_STSA_R:
     case NAL_UNIT_CODED_SLICE_STSA_N:
-    case NAL_UNIT_CODED_SLICE_BLA:
-    case NAL_UNIT_CODED_SLICE_BLANT:
+    case NAL_UNIT_CODED_SLICE_BLA_W_LP:
+    case NAL_UNIT_CODED_SLICE_BLA_W_RADL:
     case NAL_UNIT_CODED_SLICE_BLA_N_LP:
-    case NAL_UNIT_CODED_SLICE_IDR:
+    case NAL_UNIT_CODED_SLICE_IDR_W_RADL:
     case NAL_UNIT_CODED_SLICE_IDR_N_LP:
     case NAL_UNIT_CODED_SLICE_CRA:
     case NAL_UNIT_CODED_SLICE_RADL_N:
-    case NAL_UNIT_CODED_SLICE_DLP:
+    case NAL_UNIT_CODED_SLICE_RADL_R:
     case NAL_UNIT_CODED_SLICE_RASL_N:
-    case NAL_UNIT_CODED_SLICE_TFD:
+    case NAL_UNIT_CODED_SLICE_RASL_R:
     case NAL_UNIT_VPS:
     case NAL_UNIT_SPS:
     case NAL_UNIT_PPS:

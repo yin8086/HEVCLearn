@@ -82,8 +82,8 @@ Void TComPrediction::initTempBuff()
 {
   if( m_piYuvExt == NULL )
   {
-    Int extWidth  = g_uiMaxCUWidth + 16; 
-    Int extHeight = g_uiMaxCUHeight + 1;
+    Int extWidth  = MAX_CU_SIZE + 16; 
+    Int extHeight = MAX_CU_SIZE + 1;
     Int i, j;
     for (i = 0; i < 4; i++)
     {
@@ -93,20 +93,20 @@ Void TComPrediction::initTempBuff()
         m_filteredBlock[i][j].create(extWidth, extHeight);
       }
     }
-    m_iYuvExtHeight  = ((g_uiMaxCUHeight + 2) << 4);
-    m_iYuvExtStride = ((g_uiMaxCUWidth  + 8) << 4);
+    m_iYuvExtHeight  = ((MAX_CU_SIZE + 2) << 4);
+    m_iYuvExtStride = ((MAX_CU_SIZE  + 8) << 4);
     m_piYuvExt = new Int[ m_iYuvExtStride * m_iYuvExtHeight ];
 
     // new structure
-    m_acYuvPred[0] .create( g_uiMaxCUWidth, g_uiMaxCUHeight );
-    m_acYuvPred[1] .create( g_uiMaxCUWidth, g_uiMaxCUHeight );
+    m_acYuvPred[0] .create( MAX_CU_SIZE, MAX_CU_SIZE );
+    m_acYuvPred[1] .create( MAX_CU_SIZE, MAX_CU_SIZE );
 
-    m_cYuvPredTemp.create( g_uiMaxCUWidth, g_uiMaxCUHeight );
+    m_cYuvPredTemp.create( MAX_CU_SIZE, MAX_CU_SIZE );
   }
 
-  if (m_iLumaRecStride != (g_uiMaxCUWidth>>1) + 1)
+  if (m_iLumaRecStride != (MAX_CU_SIZE>>1) + 1)
   {
-    m_iLumaRecStride =  (g_uiMaxCUWidth>>1) + 1;
+    m_iLumaRecStride =  (MAX_CU_SIZE>>1) + 1;
     if (!m_pLumaRecBuffer)
     {
       m_pLumaRecBuffer = new Pel[ m_iLumaRecStride * m_iLumaRecStride ];
@@ -337,7 +337,6 @@ Void TComPrediction::predIntraLumaAng(TComPattern* pcTComPattern, UInt uiDirMode
   assert( g_aucConvertToBit[ iWidth ] <= 5 ); // 128x128
   assert( iWidth == iHeight  ); // 保证PU为方形
 
-  // log2，所以加2相当于乘以4，正好 g[x] = log2(x/4)
   ptrSrc = pcTComPattern->getPredictorPtr( uiDirMode, g_aucConvertToBit[ iWidth ] + 2, m_piYuvExt );
 
   // get starting pixel in block，ptrSrc指向的实际上是 (CUHeight2 + 1)*(CUWidth2 +1)大小的矩形
