@@ -407,19 +407,19 @@ UInt TComRdCost::calcHAD(Int bitDepth, Pel* pi0, Int iStride0, Pel* pi1, Int iSt
   UInt uiSum = 0;
   Int x, y;
   
-  if ( ( (iWidth % 8) == 0 ) && ( (iHeight % 8) == 0 ) )
+  if ( ( (iWidth % 8) == 0 ) && ( (iHeight % 8) == 0 ) ) //整数个8x8块进行 8x8 Hadmard 变换
   {
     for ( y=0; y<iHeight; y+= 8 )
     {
-      for ( x=0; x<iWidth; x+= 8 )
+      for ( x=0; x<iWidth; x+= 8 ) //所有变换结果累加， 8xWidth长条上所有的8x8块
       {
         uiSum += xCalcHADs8x8( &pi0[x], &pi1[x], iStride0, iStride1, 1 );
       }
-      pi0 += iStride0*8;
+      pi0 += iStride0*8; // 前进至下一个8xWidth长条
       pi1 += iStride1*8;
     }
   }
-  else if ( ( (iWidth % 4) == 0 ) && ( (iHeight % 4) == 0 ) )
+  else if ( ( (iWidth % 4) == 0 ) && ( (iHeight % 4) == 0 ) ) //非8 但是是4，基本同上
   {
     for ( y=0; y<iHeight; y+= 4 )
     {
@@ -433,7 +433,7 @@ UInt TComRdCost::calcHAD(Int bitDepth, Pel* pi0, Int iStride0, Pel* pi1, Int iSt
   }
   else
   {
-    for ( y=0; y<iHeight; y+= 2 )
+    for ( y=0; y<iHeight; y+= 2 ) // 2*2，但是仍使用了8x8变换矩阵?
     {
       for ( x=0; x<iWidth; x+= 2 )
       {
@@ -1480,10 +1480,23 @@ UInt TComRdCost::xCalcHADs4x4( Pel *piOrg, Pel *piCur, Int iStrideOrg, Int iStri
 
 UInt TComRdCost::xCalcHADs8x8( Pel *piOrg, Pel *piCur, Int iStrideOrg, Int iStrideCur, Int iStep )
 {
+  /*
+    Hn = (-1) ^ (i点乘j) 所谓点乘，即将i,j表示成二进制，然后每一位作为向量的一个元素，进行向量点乘
+
+    1  1  1  1  1  1  1  1
+    1  1  1  1 -1 -1 -1 -1
+    1  1 -1 -1 -1 -1  1  1
+    1  1 -1 -1  1  1 -1 -1
+    1 -1 -1  1  1 -1 -1  1
+    1 -1 -1  1 -1  1  1 -1
+    1 -1  1 -1 -1  1 -1  1
+    1 -1  1 -1  1 -1  1 -1
+
+   */
   Int k, i, j, jj, sad=0;
   Int diff[64], m1[8][8], m2[8][8], m3[8][8];
   assert( iStep == 1 );
-  for( k = 0; k < 64; k += 8 )
+  for( k = 0; k < 64; k += 8 ) //算出8x8块的残差值 = piOrg - piPred(根据Mode预测的)
   {
     diff[k+0] = piOrg[0] - piCur[0];
     diff[k+1] = piOrg[1] - piCur[1];
@@ -1498,11 +1511,13 @@ UInt TComRdCost::xCalcHADs8x8( Pel *piOrg, Pel *piCur, Int iStrideOrg, Int iStri
     piOrg += iStrideOrg;
   }
   
-  //horizontal
+  //FWHT 快速Walsh-Hadamard 变换
+  // http://en.wikipedia.org/wiki/Fast_Walsh-Hadamard_transform
+  //horizontal 实际上就是 M8 = L8 X H8
   for (j=0; j < 8; j++)
   {
-    jj = j << 3;
-    m2[j][0] = diff[jj  ] + diff[jj+4];
+    jj = j << 3; // 每一个row的首地址
+    m2[j][0] = diff[jj  ] + diff[jj+4]; 
     m2[j][1] = diff[jj+1] + diff[jj+5];
     m2[j][2] = diff[jj+2] + diff[jj+6];
     m2[j][3] = diff[jj+3] + diff[jj+7];
@@ -1530,7 +1545,7 @@ UInt TComRdCost::xCalcHADs8x8( Pel *piOrg, Pel *piCur, Int iStrideOrg, Int iStri
     m2[j][7] = m1[j][6] - m1[j][7];
   }
   
-  //vertical
+  //vertical 实际上就是 H8 X M8
   for (i=0; i < 8; i++)
   {
     m3[0][i] = m2[0][i] + m2[4][i];
@@ -1561,7 +1576,7 @@ UInt TComRdCost::xCalcHADs8x8( Pel *piOrg, Pel *piCur, Int iStrideOrg, Int iStri
     m2[7][i] = m1[6][i] - m1[7][i];
   }
   
-  for (i = 0; i < 8; i++)
+  for (i = 0; i < 8; i++) // 矩阵求绝对值之和
   {
     for (j = 0; j < 8; j++)
     {
@@ -1569,7 +1584,7 @@ UInt TComRdCost::xCalcHADs8x8( Pel *piOrg, Pel *piCur, Int iStrideOrg, Int iStri
     }
   }
   
-  sad=((sad+2)>>2);
+  sad=((sad+2)>>2); // (Sum +2) / 4
   
   return sad;
 }

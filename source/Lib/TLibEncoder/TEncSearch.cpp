@@ -2492,6 +2492,7 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
       {
         UInt uiMode = modeIdx;
 
+        //根据Mode索引，进行对应模式的帧内预测，结果放入piPred
         predIntraLumaAng( pcCU->getPattern(), uiMode, piPred, uiStride, uiWidth, uiHeight, bAboveAvail, bLeftAvail );
         
         // use hadamard transform here

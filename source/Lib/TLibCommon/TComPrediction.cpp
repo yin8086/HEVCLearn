@@ -188,15 +188,17 @@ Void TComPrediction::xPredIntraAng(Int bitDepth, Int* pSrc, Int srcStride, Pel*&
 
   // Map the mode index to main prediction direction and angle
   assert( dirMode > 0 ); //no planar
-  Bool modeDC        = dirMode < 2;
-  Bool modeHor       = !modeDC && (dirMode < 18);
-  Bool modeVer       = !modeDC && !modeHor;
+  Bool modeDC        = dirMode < 2; //是DC=1？
+  Bool modeHor       = !modeDC && (dirMode < 18); // 2 ~ 17 水平 Hor
+  Bool modeVer       = !modeDC && !modeHor;//  18 ~ 34  Ver
+  // Angle = Mode - VER(26) | HOR(10 - HOR)  (+|-)(0~8)
   Int intraPredAngle = modeVer ? (Int)dirMode - VER_IDX : modeHor ? -((Int)dirMode - HOR_IDX) : 0;
-  Int absAng         = abs(intraPredAngle);
-  Int signAng        = intraPredAngle < 0 ? -1 : 1;
+  Int absAng         = abs(intraPredAngle); //角度绝对值 0~8
+  Int signAng        = intraPredAngle < 0 ? -1 : 1; //角度符号
 
   // Set bitshifts and scale the angle parameter to block size
-  Int angTable[9]    = {0,    2,    5,   9,  13,  17,  21,  26,  32};
+  Int angTable[9]    = {0,    2,    5,   9,  13,  17,  21,  26,  32}; //角度值, Angle
+  //对Angle的值进行放大，定点数进行浮点运算
   Int invAngTable[9] = {0, 4096, 1638, 910, 630, 482, 390, 315, 256}; // (256 * 32) / Angle
   Int invAngle       = invAngTable[absAng];
   absAng             = angTable[absAng];
@@ -205,6 +207,7 @@ Void TComPrediction::xPredIntraAng(Int bitDepth, Int* pSrc, Int srcStride, Pel*&
   // Do the DC prediction
   if (modeDC)
   {
+    //dcVal = (∑leftCol[i] +∑topRow[j] + Width) / (width+height) (i = 0~Width)
     Pel dcval = predIntraGetPredValDC(pSrc, srcStride, width, height, blkAboveAvailable, blkLeftAvailable);
 
     for (k=0;k<blkSize;k++)
@@ -225,55 +228,59 @@ Void TComPrediction::xPredIntraAng(Int bitDepth, Int* pSrc, Int srcStride, Pel*&
     Pel  refLeft[2*MAX_CU_SIZE+1];
 
     // Initialise the Main and Left reference array.
-    if (intraPredAngle < 0)
+    if (intraPredAngle < 0) // 负值角度,此时ref[x],x值有正有负blkSize*intraPredAngle>>5 ~ -1 ~ Width
     {
-      for (k=0;k<blkSize+1;k++)
+      for (k=0;k<blkSize+1;k++)// 左上1个，上面Width个。refAbove前面空blkSize-1个位置
       {
         refAbove[k+blkSize-1] = pSrc[k-srcStride-1];
       }
-      for (k=0;k<blkSize+1;k++)
+      for (k=0;k<blkSize+1;k++)// 左上1个，左边Height个。refLeft前面空blkSize-1个位置
       {
         refLeft[k+blkSize-1] = pSrc[(k-1)*srcStride-1];
       }
+      
+      // Ver垂直，从上到下，18~34，则会主Above，否则主Left
       refMain = (modeVer ? refAbove : refLeft) + (blkSize-1);
       refSide = (modeVer ? refLeft : refAbove) + (blkSize-1);
 
-      // Extend the Main reference to the left.
+      // Extend the Main reference to the left. 将AboveRow扩展到左侧AboveRow，LeftCol到上LeftCol
       Int invAngleSum    = 128;       // rounding for (shift by 8)
       for (k=-1; k>blkSize*intraPredAngle>>5; k--)
       {
-        invAngleSum += invAngle;
-        refMain[k] = refSide[invAngleSum>>8];
+        invAngleSum += invAngle; // invASum = 循环次数（-k) * invAngle(正)
+        refMain[k] = refSide[invAngleSum>>8]; // = refSide[(-k*invAngle)>>8] 
       }
     }
-    else
+    else //此时ref[x]值，只有正值 0~2*Widith
     {
       for (k=0;k<2*blkSize+1;k++)
       {
-        refAbove[k] = pSrc[k-srcStride-1];
+        refAbove[k] = pSrc[k-srcStride-1]; //左上到右上 -1 ~ 127
       }
       for (k=0;k<2*blkSize+1;k++)
       {
-        refLeft[k] = pSrc[(k-1)*srcStride-1];
+        refLeft[k] = pSrc[(k-1)*srcStride-1];// 左上到左下 -1 ~ 127
       }
       refMain = modeVer ? refAbove : refLeft;
       refSide = modeVer ? refLeft  : refAbove;
     }
 
-    if (intraPredAngle == 0)
+    if (intraPredAngle == 0) // 角度为0, HOR_IDX或VER_IDX
     {
       for (k=0;k<blkSize;k++)
       {
         for (l=0;l<blkSize;l++)
         {
-          pDst[k*dstStride+l] = refMain[l+1];
+          // 直接用refMain的,这里是取得对应列的，即Ver模式，如果实际是Hor，则后面会对pDst进行转置
+          pDst[k*dstStride+l] = refMain[l+1]; 
         }
       }
 
       if ( bFilter )
       {
-        for (k=0;k<blkSize;k++)
+        for (k=0;k<blkSize;k++) //对PU左侧第一列进行滤波
         {
+          // 滤波后的值为(原值 + (左侧像素值 - 左上像素值)/2) 之后的值进行窗口操作(限定最小最大)
           pDst[k*dstStride] = Clip3(0, (1<<bitDepth)-1, pDst[k*dstStride] + (( refSide[k+1] - refSide[0] ) >> 1) );
         }
       }
@@ -281,22 +288,23 @@ Void TComPrediction::xPredIntraAng(Int bitDepth, Int* pSrc, Int srcStride, Pel*&
     else
     {
       Int deltaPos=0;
-      Int deltaInt;
-      Int deltaFract;
+      Int deltaInt; // draft 8-50 iIdx  ( ( y + 1 ) * intraPredAngle )  >>  5 (= X/32即以32为单位坐标值整数部分)
+      Int deltaFract;// draft 8-51 iFract   ( ( y + 1 ) * intraPredAngle ) & 31(= X%32即即以32为单位坐标值小数部分)
       Int refMainIndex;
 
       for (k=0;k<blkSize;k++)
       {
-        deltaPos += intraPredAngle;
+        deltaPos += intraPredAngle; //k显然为row，draft中的y。一次循环加一次
         deltaInt   = deltaPos >> 5;
         deltaFract = deltaPos & (32 - 1);
 
-        if (deltaFract)
+        if (deltaFract) //有余数(小数)
         {
           // Do linear filtering
           for (l=0;l<blkSize;l++)
           {
-            refMainIndex        = l+deltaInt+1;
+            refMainIndex        = l+deltaInt+1; //整数索引
+            //将对应位置，以及对应位置前面一个位置值按照小数部分进行比例加权得到最后值
             pDst[k*dstStride+l] = (Pel) ( ((32-deltaFract)*refMain[refMainIndex]+deltaFract*refMain[refMainIndex+1]+16) >> 5 );
           }
         }
@@ -305,17 +313,17 @@ Void TComPrediction::xPredIntraAng(Int bitDepth, Int* pSrc, Int srcStride, Pel*&
           // Just copy the integer samples
           for (l=0;l<blkSize;l++)
           {
-            pDst[k*dstStride+l] = refMain[l+deltaInt+1];
+            pDst[k*dstStride+l] = refMain[l+deltaInt+1]; //复制整数位置处的即可，仍未Ver模式
           }
         }
       }
     }
 
     // Flip the block if this is the horizontal mode
-    if (modeHor)
+    if (modeHor) // 将前面按照Ver计算的pDst块进行转置
     {
       Pel  tmp;
-      for (k=0;k<blkSize-1;k++)
+      for (k=0;k<blkSize-1;k++) //对上三角矩阵的元素处理
       {
         for (l=k+1;l<blkSize;l++)
         {
@@ -340,16 +348,17 @@ Void TComPrediction::predIntraLumaAng(TComPattern* pcTComPattern, UInt uiDirMode
   ptrSrc = pcTComPattern->getPredictorPtr( uiDirMode, g_aucConvertToBit[ iWidth ] + 2, m_piYuvExt );
 
   // get starting pixel in block，ptrSrc指向的实际上是 (CUHeight2 + 1)*(CUWidth2 +1)大小的矩形
-  Int sw = 2 * iWidth + 1; //这里从(-1,-1)位置处，到(0,0)位置处，即到达当前PU左上角
+  Int sw = 2 * iWidth + 1; //sw即是所谓的Stride
 
   // Create the prediction
   if ( uiDirMode == PLANAR_IDX )
   {
-    xPredIntraPlanar( ptrSrc+sw+1, sw, pDst, uiStride, iWidth, iHeight );
+    // +sw+1正好是PU的首地址
+    xPredIntraPlanar( ptrSrc+sw+1, sw, pDst, uiStride, iWidth, iHeight );// 平面预测
   }
   else
   {
-    if ( (iWidth > 16) || (iHeight > 16) )
+    if ( (iWidth > 16) || (iHeight > 16) ) // 32,64则不再进行bFilter
     {
       xPredIntraAng(g_bitDepthY, ptrSrc+sw+1, sw, pDst, uiStride, iWidth, iHeight, uiDirMode, bAbove, bLeft, false );
     }
@@ -693,8 +702,8 @@ Void TComPrediction::xPredIntraPlanar( Int* pSrc, Int srcStride, Pel* rpDst, Int
   Int leftColumn[MAX_CU_SIZE], topRow[MAX_CU_SIZE], bottomRow[MAX_CU_SIZE], rightColumn[MAX_CU_SIZE];
   UInt blkSize = width;
   UInt offset2D = width;
-  UInt shift1D = g_aucConvertToBit[ width ] + 2;
-  UInt shift2D = shift1D + 1;
+  UInt shift1D = g_aucConvertToBit[ width ] + 2; //log2(CUWidth)
+  UInt shift2D = shift1D + 1; // log2(CUWidth) + 1
 
   // Get left and above reference column and row
   for(k=0;k<blkSize+1;k++)
@@ -708,21 +717,21 @@ Void TComPrediction::xPredIntraPlanar( Int* pSrc, Int srcStride, Pel* rpDst, Int
   topRight   = topRow[blkSize];
   for (k=0;k<blkSize;k++)
   {
-    bottomRow[k]   = bottomLeft - topRow[k];
-    rightColumn[k] = topRight   - leftColumn[k];
-    topRow[k]      <<= shift1D;
-    leftColumn[k]  <<= shift1D;
+    bottomRow[k]   = bottomLeft - topRow[k]; //左下减去上行对应元
+    rightColumn[k] = topRight   - leftColumn[k]; //右上减去左列对应元 
+    topRow[k]      <<= shift1D; // 乘以CUWidth
+    leftColumn[k]  <<= shift1D;//乘以CUWidth
   }
 
   // Generate prediction signal
   for (k=0;k<blkSize;k++)
   {
-    horPred = leftColumn[k] + offset2D;
+    horPred = leftColumn[k] + offset2D; //horPred = 左列元 + CuWidth
     for (l=0;l<blkSize;l++)
     {
-      horPred += rightColumn[k];
-      topRow[l] += bottomRow[l];
-      rpDst[k*dstStride+l] = ( (horPred + topRow[l]) >> shift2D );
+      horPred += rightColumn[k]; // horPred += 右列元,horPred = 左列元 + CuWidth + (l+1)*rightCol[k]
+      topRow[l] += bottomRow[l]; // topROw[l] += bottomRow[l], topRow[l] = topRow[l] + (k+1)*bottomRow[l]
+      rpDst[k*dstStride+l] = ( (horPred + topRow[l]) >> shift2D ); 
     }
   }
 }
@@ -742,16 +751,18 @@ Void TComPrediction::xDCPredFiltering( Int* pSrc, Int iSrcStride, Pel*& rpDst, I
   Pel* pDst = rpDst;
   Int x, y, iDstStride2, iSrcStride2;
 
-  // boundary pixels processing
+  // boundary pixels processing,图片坐标轴。当前PU起始点pDst[0]=[(0,-1)+(-1,0)+2*(0,0)]/4
   pDst[0] = (Pel)((pSrc[-iSrcStride] + pSrc[-1] + 2 * pDst[0] + 2) >> 2);
 
   for ( x = 1; x < iWidth; x++ )
   {
+    //第一Row，后面元素 = (Pixel[row-1][col] + 3*dcVal(自身) +2 ) / 4
     pDst[x] = (Pel)((pSrc[x - iSrcStride] +  3 * pDst[x] + 2) >> 2);
   }
 
   for ( y = 1, iDstStride2 = iDstStride, iSrcStride2 = iSrcStride-1; y < iHeight; y++, iDstStride2+=iDstStride, iSrcStride2+=iSrcStride )
   {
+    //第一Col，后面元素 = (Pixel[row][col-1] + 3*dcVal(自身) +2 ) / 4
     pDst[iDstStride2] = (Pel)((pSrc[iSrcStride2] + 3 * pDst[iDstStride2] + 2) >> 2);
   }
 
