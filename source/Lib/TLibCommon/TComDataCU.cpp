@@ -1892,7 +1892,7 @@ Void TComDataCU::setQPSubParts( Int qp, UInt uiAbsPartIdx, UInt uiDepth )
 Void TComDataCU::setLumaIntraDirSubParts( UInt uiDir, UInt uiAbsPartIdx, UInt uiDepth )
 {
   UInt uiCurrPartNumb = m_pcPic->getNumPartInCU() >> (uiDepth << 1);
-  
+  // m_puhLumaIntraDir是按照最小快划分的（256），因此此句当前大PU所有小块全赋值
   memset( m_puhLumaIntraDir + uiAbsPartIdx, uiDir, sizeof(UChar)*uiCurrPartNumb );
 }
 

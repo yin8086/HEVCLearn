@@ -408,7 +408,7 @@ UInt TComRdCost::calcHAD(Int bitDepth, Pel* pi0, Int iStride0, Pel* pi1, Int iSt
   Int x, y;
   
   if ( ( (iWidth % 8) == 0 ) && ( (iHeight % 8) == 0 ) ) //整数个8x8块进行 8x8 Hadmard 变换
-  {
+  {// 4 * 2 * n
     for ( y=0; y<iHeight; y+= 8 )
     {
       for ( x=0; x<iWidth; x+= 8 ) //所有变换结果累加， 8xWidth长条上所有的8x8块
@@ -420,7 +420,7 @@ UInt TComRdCost::calcHAD(Int bitDepth, Pel* pi0, Int iStride0, Pel* pi1, Int iSt
     }
   }
   else if ( ( (iWidth % 4) == 0 ) && ( (iHeight % 4) == 0 ) ) //非8 但是是4，基本同上
-  {
+  {// 4 * (2n+1)
     for ( y=0; y<iHeight; y+= 4 )
     {
       for ( x=0; x<iWidth; x+= 4 )
@@ -1389,7 +1389,7 @@ UInt TComRdCost::xCalcHADs4x4( Pel *piOrg, Pel *piCur, Int iStrideOrg, Int iStri
   Int k, satd = 0, diff[16], m[16], d[16];
   
   assert( iStep == 1 );
-  for( k = 0; k < 16; k+=4 )
+  for( k = 0; k < 16; k+=4 ) // 计算残差
   {
     diff[k+0] = piOrg[0] - piCur[0];
     diff[k+1] = piOrg[1] - piCur[1];

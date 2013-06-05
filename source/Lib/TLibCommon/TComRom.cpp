@@ -313,7 +313,7 @@ UInt g_uiPCMBitDepthChroma   = 8;    // PCM bit-depth
 // ====================================================================================================================
 // Misc.
 // ====================================================================================================================
-
+// g_aucConvertToBit[ x ]: log2(x/4), if x=4 -> 0, x=8 -> 1, x=16 -> 2, ...
 Char  g_aucConvertToBit  [ MAX_CU_SIZE+1 ];
 
 #if ENC_DEC_TRACE
@@ -512,8 +512,8 @@ Int g_quantInterDefault8x8[64] =
   20,24,25,28,33,41,54,71,
   24,25,28,33,41,54,71,91
 };
-UInt g_scalingListSize   [4] = {16,64,256,1024}; 
-UInt g_scalingListSizeX  [4] = { 4, 8, 16,  32};
+UInt g_scalingListSize   [4] = {16,64,256,1024}; //矩阵元素个数
+UInt g_scalingListSizeX  [4] = { 4, 8, 16,  32}; //矩阵行数
 UInt g_scalingListNum[SCALING_LIST_SIZE_NUM]={6,6,6,2};
 Int  g_eTTable[4] = {0,3,1,2};
 

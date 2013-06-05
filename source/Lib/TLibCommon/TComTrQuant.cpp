@@ -263,14 +263,14 @@ void xTr(Int bitDepth, Pel *block, Int *coeff, UInt uiStride, UInt uiTrSize, UIn
       iT  =  g_as_DST_MAT_4[0];
     }
   }
-  for (i=0; i<uiTrSize; i++)
+  for (i=0; i<uiTrSize; i++) // X(t)的j列与A(t)的i列(A的行)
   {
     for (j=0; j<uiTrSize; j++)
     {
       iSum = 0;
-      for (k=0; k<uiTrSize; k++)
+      for (k=0; k<uiTrSize; k++) // AX = X(t)A(t)
       {
-        iSum += iT[i*uiTrSize+k]*block[j*uiStride+k];
+        iSum += iT[i*uiTrSize+k]*block[j*uiStride+k]; // i行，j行，实际是正确的
       }
       tmp[i*uiTrSize+j] = (iSum + add_1st)>>shift_1st;
     }
@@ -290,12 +290,12 @@ void xTr(Int bitDepth, Pel *block, Int *coeff, UInt uiStride, UInt uiTrSize, UIn
   }
   for (i=0; i<uiTrSize; i++)
   {                 
-    for (j=0; j<uiTrSize; j++)
+    for (j=0; j<uiTrSize; j++) // ZA(t)
     {
       iSum = 0;
       for (k=0; k<uiTrSize; k++)
       {
-        iSum += iT[i*uiTrSize+k]*tmp[j*uiTrSize+k];        
+        iSum += iT[i*uiTrSize+k]*tmp[j*uiTrSize+k];  // 基本同上
       }
       coeff[i*uiTrSize+j] = (iSum + add_2nd)>>shift_2nd; 
     }
@@ -665,7 +665,7 @@ void partialButterfly32(Short *src,Short *dst,Int shift, Int line)
   Int EE[8],EO[8];
   Int EEE[4],EEO[4];
   Int EEEE[2],EEEO[2];
-  Int add = 1<<(shift-1);
+  Int add = 1<<(shift-1); // = 2 ** (shift - 1)
 
   for (j=0; j<line; j++)
   {    
@@ -785,13 +785,14 @@ void partialButterflyInverse32(Short *src,Short *dst,Int shift, Int line)
 */
 void xTrMxN(Int bitDepth, Short *block,Short *coeff, Int iWidth, Int iHeight, UInt uiMode)
 {
+  // 两步骤中的Shift移位 E243
   Int shift_1st = g_aucConvertToBit[iWidth]  + 1 + bitDepth-8; // log2(iWidth) - 1 + g_bitDepth - 8
-  Int shift_2nd = g_aucConvertToBit[iHeight]  + 8;                   // log2(iHeight) + 6
+  Int shift_2nd = g_aucConvertToBit[iHeight]  + 8;  // g_[x] = log(x) - 2 // log2(iHeight) + 6
 
   Short tmp[ 64 * 64 ];
-
+  //partialButte实际上就是lhs 与 rhs 右乘
   if( iWidth == 4 && iHeight == 4)
-  {
+  { //4x4 LUMA Intra 采用DST
     if (uiMode != REG_DCT)
     {
       fastForwardDst(block,tmp,shift_1st); // Forward DST BY FAST ALGORITHM, block input, tmp output
@@ -804,17 +805,17 @@ void xTrMxN(Int bitDepth, Short *block,Short *coeff, Int iWidth, Int iHeight, UI
     }
 
   }
-  else if( iWidth == 8 && iHeight == 8)
+  else if( iWidth == 8 && iHeight == 8) //8x8 
   {
     partialButterfly8( block, tmp, shift_1st, iHeight );
     partialButterfly8( tmp, coeff, shift_2nd, iWidth );
   }
-  else if( iWidth == 16 && iHeight == 16)
+  else if( iWidth == 16 && iHeight == 16) // 16x16
   {
     partialButterfly16( block, tmp, shift_1st, iHeight );
     partialButterfly16( tmp, coeff, shift_2nd, iWidth );
   }
-  else if( iWidth == 32 && iHeight == 32)
+  else if( iWidth == 32 && iHeight == 32)// 32x32
   {
     partialButterfly32( block, tmp, shift_1st, iHeight );
     partialButterfly32( tmp, coeff, shift_2nd, iWidth );
@@ -1217,6 +1218,19 @@ Void TComTrQuant::transformNxN( TComDataCU* pcCU,
                                Bool        useTransformSkip
                                )
 {
+  // 变换前
+  /*
+  std::cout<<"1  ====================="<<endl;
+  for (UInt k = 0; k<uiHeight; k++)
+  {
+    for (UInt j = 0; j<uiWidth; j++)
+    {
+      std::cout.width(5);
+      std::cout<<pcResidual[k*uiStride+j];
+    }
+    std::cout<<std::endl;
+  }*/
+
   if (pcCU->getCUTransquantBypass(uiAbsPartIdx))
   {
     uiAbsSum=0;
@@ -1233,7 +1247,7 @@ Void TComTrQuant::transformNxN( TComDataCU* pcCU,
   UInt uiMode;  //luma intra pred
   if(eTType == TEXT_LUMA && pcCU->getPredictionMode(uiAbsPartIdx) == MODE_INTRA )
   {
-    uiMode = pcCU->getLumaIntraDir( uiAbsPartIdx );
+    uiMode = pcCU->getLumaIntraDir( uiAbsPartIdx );//Intra Luma ģʽ
   }
   else
   {
@@ -1243,19 +1257,47 @@ Void TComTrQuant::transformNxN( TComDataCU* pcCU,
   uiAbsSum = 0;
   assert( (pcCU->getSlice()->getSPS()->getMaxTrSize() >= uiWidth) );
   Int bitDepth = eTType == TEXT_LUMA ? g_bitDepthY : g_bitDepthC;
-  if(useTransformSkip)
+  if(useTransformSkip) //变换Skip
   {
     xTransformSkip(bitDepth, pcResidual, uiStride, m_plTempCoeff, uiWidth, uiHeight );
   }
-  else
+  else // 进行一般变换
   {
     xT(bitDepth, uiMode, pcResidual, uiStride, m_plTempCoeff, uiWidth, uiHeight );
   }
+
+  // 变换后
+  /*
+  std::cout<<"2   ====================="<<endl;
+  for (UInt k = 0; k<uiHeight; k++)
+  {
+    for (UInt j = 0; j<uiWidth; j++)
+    {
+      std::cout.width(5);
+      std::cout<<m_plTempCoeff[k*uiStride+j];
+    }
+    std::cout<<std::endl;
+  }*/
+
   xQuant( pcCU, m_plTempCoeff, rpcCoeff,
 #if ADAPTIVE_QP_SELECTION
        rpcArlCoeff,
 #endif
-       uiWidth, uiHeight, uiAbsSum, eTType, uiAbsPartIdx );
+       uiWidth, uiHeight, uiAbsSum, eTType, uiAbsPartIdx ); // 进行量化
+
+  // 量化后
+  /*
+  std::cout<<"3  ====================="<<endl;
+  for (UInt k = 0; k<uiHeight; k++)
+  {
+    for (UInt j = 0; j<uiWidth; j++)
+    {
+      std::cout.width(5);
+      std::cout<<rpcCoeff[k*uiStride+j];
+    }
+    std::cout<<std::endl;
+  }*/
+
 }
 
 Void TComTrQuant::invtransformNxN( Bool transQuantBypass, TextType eText, UInt uiMode,Pel* rpcResidual, UInt uiStride, TCoeff*   pcCoeff, UInt uiWidth, UInt uiHeight,  Int scalingListType, Bool useTransformSkip )
@@ -1272,7 +1314,7 @@ Void TComTrQuant::invtransformNxN( Bool transQuantBypass, TextType eText, UInt u
     return;
   }
   Int bitDepth = eText == TEXT_LUMA ? g_bitDepthY : g_bitDepthC;
-  xDeQuant(bitDepth, pcCoeff, m_plTempCoeff, uiWidth, uiHeight, scalingListType);
+  xDeQuant(bitDepth, pcCoeff, m_plTempCoeff, uiWidth, uiHeight, scalingListType); //反量化
   if(useTransformSkip == true)
   {
     xITransformSkip(bitDepth, m_plTempCoeff, rpcResidual, uiStride, uiWidth, uiHeight );
@@ -1350,7 +1392,7 @@ Void TComTrQuant::xT(Int bitDepth, UInt uiMode, Pel* piBlkResi, UInt uiStride, I
     Short block[ 64 * 64 ];
     Short coeff[ 64 * 64 ];
     {
-      for (j = 0; j < iHeight; j++)
+      for (j = 0; j < iHeight; j++) // 先进行批量复制
       {    
         memcpy( block + j * iWidth, piBlkResi + j * uiStride, iWidth * sizeof( Short ) );
       }
@@ -2492,14 +2534,14 @@ Void TComTrQuant::setFlatScalingList()
   UInt size,list;
   UInt qp;
 
-  for(size=0;size<SCALING_LIST_SIZE_NUM;size++)
+  for(size=0;size<SCALING_LIST_SIZE_NUM;size++) //总共有几种尺寸的List存在,4-32
   {
-    for(list = 0; list <  g_scalingListNum[size]; list++)
+    for(list = 0; list <  g_scalingListNum[size]; list++) // 6 6 6 2
     {
-      for(qp=0;qp<SCALING_LIST_REM_NUM;qp++)
+      for(qp=0;qp<SCALING_LIST_REM_NUM;qp++) //Qp%6总共6个索引,0-5
       {
         xsetFlatScalingList(list,size,qp);
-        setErrScaleCoeff(list,size,qp);
+        setErrScaleCoeff(list,size,qp); // 设置Quant时候的offset
       }
     }
   }
@@ -2512,16 +2554,16 @@ Void TComTrQuant::setFlatScalingList()
  */
 Void TComTrQuant::xsetFlatScalingList(UInt list, UInt size, UInt qp)
 {
-  UInt i,num = g_scalingListSize[size];
+  UInt i,num = g_scalingListSize[size]; //第size张表
   Int *quantcoeff;
   Int *dequantcoeff;
-  Int quantScales = g_quantScales[qp];
-  Int invQuantScales = g_invQuantScales[qp]<<4;
+  Int quantScales = g_quantScales[qp]; //真正的Q(乘法因子)表，以Qp/6为索引
+  Int invQuantScales = g_invQuantScales[qp]<<4;// 真正的IQ(反乘法因子)
 
-  quantcoeff   = getQuantCoeff(list, qp, size);
+  quantcoeff   = getQuantCoeff(list, qp, size); // 去除相应表项的地址
   dequantcoeff = getDequantCoeff(list, qp, size);
 
-  for(i=0;i<num;i++)
+  for(i=0;i<num;i++) // 一一赋值
   { 
     *quantcoeff++ = quantScales;
     *dequantcoeff++ = invQuantScales;

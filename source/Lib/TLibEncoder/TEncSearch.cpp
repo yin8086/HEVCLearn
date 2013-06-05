@@ -1008,7 +1008,7 @@ TEncSearch::xIntraCodingLumaBlk( TComDataCU* pcCU,
                                 TComYuv*    pcPredYuv, 
                                 TComYuv*    pcResiYuv, 
                                 UInt&       ruiDist,
-                                Int        default0Save1Load2 )
+                                Int        default0Save1Load2 ) //针对Luma的Blk进行帧内编码
 {
   UInt    uiLumaPredMode    = pcCU     ->getLumaIntraDir     ( uiAbsPartIdx );
   UInt    uiFullDepth       = pcCU     ->getDepth   ( 0 )  + uiTrDepth;
@@ -1021,11 +1021,12 @@ TEncSearch::xIntraCodingLumaBlk( TComDataCU* pcCU,
   Pel*    piReco            = pcPredYuv->getLumaAddr( uiAbsPartIdx );
   
   UInt    uiLog2TrSize      = g_aucConvertToBit[ pcCU->getSlice()->getSPS()->getMaxCUWidth() >> uiFullDepth ] + 2;
-  UInt    uiQTLayer         = pcCU->getSlice()->getSPS()->getQuadtreeTULog2MaxSize() - uiLog2TrSize;
+  UInt    uiQTLayer         = pcCU->getSlice()->getSPS()->getQuadtreeTULog2MaxSize() - uiLog2TrSize; 
+  // Per Increment 实际上就是最小快4x4的元素个数16个
   UInt    uiNumCoeffPerInc  = pcCU->getSlice()->getSPS()->getMaxCUWidth() * pcCU->getSlice()->getSPS()->getMaxCUHeight() >> ( pcCU->getSlice()->getSPS()->getMaxCUDepth() << 1 );
-  TCoeff* pcCoeff           = m_ppcQTTempCoeffY[ uiQTLayer ] + uiNumCoeffPerInc * uiAbsPartIdx;
+  TCoeff* pcCoeff           = m_ppcQTTempCoeffY[ uiQTLayer ] + uiNumCoeffPerInc * uiAbsPartIdx; //调整指向
 #if ADAPTIVE_QP_SELECTION
-  Int*    pcArlCoeff        = m_ppcQTTempArlCoeffY[ uiQTLayer ] + uiNumCoeffPerInc * uiAbsPartIdx;
+  Int*    pcArlCoeff        = m_ppcQTTempArlCoeffY[ uiQTLayer ] + uiNumCoeffPerInc * uiAbsPartIdx;//调整指向
 #endif
   Pel*    piRecQt           = m_pcQTTempTComYuv[ uiQTLayer ].getLumaAddr( uiAbsPartIdx );
   UInt    uiRecQtStride     = m_pcQTTempTComYuv[ uiQTLayer ].getStride  ();
@@ -1076,7 +1077,7 @@ TEncSearch::xIntraCodingLumaBlk( TComDataCU* pcCU,
   }
   //===== get residual signal =====
   {
-    // get residual
+    // get residual ,计算残差数据并存储
     Pel*  pOrg    = piOrg;
     Pel*  pPred   = piPred;
     Pel*  pResi   = piResi;
@@ -1095,19 +1096,19 @@ TEncSearch::xIntraCodingLumaBlk( TComDataCU* pcCU,
   //===== transform and quantization =====
   //--- init rate estimation arrays for RDOQ ---
   if( useTransformSkip? m_pcEncCfg->getUseRDOQTS():m_pcEncCfg->getUseRDOQ())
-  {
+  {// 估计量化使用Bit数目
     m_pcEntropyCoder->estimateBit( m_pcTrQuant->m_pcEstBitsSbac, uiWidth, uiWidth, TEXT_LUMA );
   }
   //--- transform and quantization ---
   UInt uiAbsSum = 0;
-  pcCU       ->setTrIdxSubParts ( uiTrDepth, uiAbsPartIdx, uiFullDepth );
+  pcCU       ->setTrIdxSubParts ( uiTrDepth, uiAbsPartIdx, uiFullDepth ); //设置TU所在深度
 
   m_pcTrQuant->setQPforQuant    ( pcCU->getQP( 0 ), TEXT_LUMA, pcCU->getSlice()->getSPS()->getQpBDOffsetY(), 0 );
 
 #if RDOQ_CHROMA_LAMBDA 
   m_pcTrQuant->selectLambda     (TEXT_LUMA);  
 #endif
-
+  // 进行NxN的变换量化
   m_pcTrQuant->transformNxN     ( pcCU, piResi, uiStride, pcCoeff, 
 #if ADAPTIVE_QP_SELECTION
     pcArlCoeff, 
@@ -1373,7 +1374,7 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
                                 UInt&        ruiDistY,
                                 UInt&        ruiDistC,
 #if HHI_RQT_INTRA_SPEEDUP
-                                Bool         bCheckFirst,
+                                Bool         bCheckFirst, // 很关键的参数，设置为True之时，TU划分等于PU划分，计算出RD最优（不同PU划分预测)，False时在进行详细TU划分
 #endif
                                 Double&      dRDCost )
 {
@@ -1381,14 +1382,14 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
   UInt    uiLog2TrSize  = g_aucConvertToBit[ pcCU->getSlice()->getSPS()->getMaxCUWidth() >> uiFullDepth ] + 2;
   Bool    bCheckFull    = ( uiLog2TrSize  <= pcCU->getSlice()->getSPS()->getQuadtreeTULog2MaxSize() );
   Bool    bCheckSplit   = ( uiLog2TrSize  >  pcCU->getQuadtreeTULog2MinSizeInCU(uiAbsPartIdx) );
-  
+  // checkFull 大于TU最大块，可以直接变换,checkSplit就是可以进行分割，大于最小快
 #if HHI_RQT_INTRA_SPEEDUP
 #if L0232_RD_PENALTY
   Int maxTuSize = pcCU->getSlice()->getSPS()->getQuadtreeTULog2MaxSize();
   Int isIntraSlice = (pcCU->getSlice()->getSliceType() == I_SLICE);
   // don't check split if TU size is less or equal to max TU size
-  Bool noSplitIntraMaxTuSize = bCheckFull;
-  if(m_pcEncCfg->getRDpenalty() && ! isIntraSlice)
+  Bool noSplitIntraMaxTuSize = bCheckFull; //当前层CU大小小于最大TU，就不用分了。直接最大的上？
+  if(m_pcEncCfg->getRDpenalty() && ! isIntraSlice) //非Intra时候的Rd Penalty
   {
     // in addition don't check split if TU size is less or equal to 16x16 TU size for non-intra slice
     noSplitIntraMaxTuSize = ( uiLog2TrSize  <= min(maxTuSize,4) );
@@ -1404,7 +1405,7 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
   if( bCheckFirst && bCheckFull )
 #endif
   {
-    bCheckSplit = false;
+    bCheckSplit = false; //可以不分且为第一个时候，直接不分
   }
 #else
 #if L0232_RD_PENALTY
@@ -1428,16 +1429,16 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
   UInt    heightTransformSkip = pcCU->getHeight( 0 ) >> uiTrDepth;
   Int     bestModeId    = 0;
   Int     bestModeIdUV[2] = {0, 0};
-  checkTransformSkip         &= (widthTransformSkip == 4 && heightTransformSkip == 4);
-  checkTransformSkip         &= (!pcCU->getCUTransquantBypass(0));
+  checkTransformSkip         &= (widthTransformSkip == 4 && heightTransformSkip == 4); // 允许Skip，且TU=4*4的时候才进行Skip
+  checkTransformSkip         &= (!pcCU->getCUTransquantBypass(0)); //次Flag成立
   checkTransformSkip         &= (!((pcCU->getQP( 0 ) == 0) && (pcCU->getSlice()->getSPS()->getUseLossless())));
   if ( m_pcEncCfg->getUseTransformSkipFast() )
   {
     checkTransformSkip       &= (pcCU->getPartitionSize(uiAbsPartIdx)==SIZE_NxN);
-  }
-  if( bCheckFull )
+  }// 完成一系列条件匹配才会进行Skip设置
+  if( bCheckFull ) //不划分块
   {
-    if(checkTransformSkip == true)
+    if(checkTransformSkip == true) //直接Skip模式，不再变换?
     {
       //----- store original entropy coding status -----
       if( m_bUseSBACRD)
@@ -1560,8 +1561,9 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
         }
       }
     }
-    else
+    else //准备进行Tr
     {
+      //对当前子块设置Skip模式
       pcCU ->setTransformSkipSubParts ( 0, TEXT_LUMA, uiAbsPartIdx, uiFullDepth ); 
       //----- store original entropy coding status -----
       if( m_bUseSBACRD && bCheckSplit )
@@ -1600,7 +1602,7 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
     }
   }
   
-  if( bCheckSplit )
+  if( bCheckSplit ) // 进行划分
   {
     //----- store full entropy coding status, load original entropy coding status -----
     if( m_bUseSBACRD )
@@ -1619,7 +1621,7 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
     Double  dSplitCost      = 0.0;
     UInt    uiSplitDistY    = 0;
     UInt    uiSplitDistC    = 0;
-    UInt    uiQPartsDiv     = pcCU->getPic()->getNumPartInCU() >> ( ( uiFullDepth + 1 ) << 1 );
+    UInt    uiQPartsDiv     = pcCU->getPic()->getNumPartInCU() >> ( ( uiFullDepth + 1 ) << 1 );// 256 -> 64 * 4, 64 -> 32
     UInt    uiAbsPartIdxSub = uiAbsPartIdx;
 
     UInt    uiSplitCbfY = 0;
@@ -1627,7 +1629,7 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
     UInt    uiSplitCbfV = 0;
 
     for( UInt uiPart = 0; uiPart < 4; uiPart++, uiAbsPartIdxSub += uiQPartsDiv )
-    {
+    { // 进行划分后递归变换，深度加一层
 #if HHI_RQT_INTRA_SPEEDUP
       xRecurIntraCodingQT( pcCU, uiTrDepth + 1, uiAbsPartIdxSub, bLumaOnly, pcOrgYuv, pcPredYuv, pcResiYuv, uiSplitDistY, uiSplitDistC, bCheckFirst, dSplitCost );
 #else
@@ -2444,7 +2446,7 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
   UInt    uiWidthBit     = pcCU->getIntraSizeIdx(0);
   UInt    uiOverallDistY = 0;
   UInt    uiOverallDistC = 0;
-  UInt    CandNum;
+  UInt    CandNum; //候选Mode的总数
   Double  CandCostList[ FAST_UDI_MAX_RDMODE_NUM ];
   
   //===== set QP and clear Cbf =====
@@ -2478,7 +2480,7 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
     Int numModesForFullRD = g_aucIntraModeNumFast[ uiWidthBit ]; //根据PU大小选取最可能的模式个数
     
     Bool doFastSearch = (numModesForFullRD != numModesAvailable); //由MPM存在就进行快速搜索
-    if (doFastSearch)
+    if (doFastSearch) // 即只要要求RD计算个数 < 总Mode数，都要进行最佳候选分析
     {
       assert(numModesForFullRD < numModesAvailable);
 
@@ -2501,13 +2503,15 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
         UInt   iModeBits = xModeBitsIntra( pcCU, uiMode, uiPU, uiPartOffset, uiDepth, uiInitTrDepth );
         Double cost      = (Double)uiSad + (Double)iModeBits * m_pcRdCost->getSqrtLambda();
         
+        //更新候选列表（按照Cost从小到大排序，一个表为ModeIdx，另一个为Cost。返回1插入，0没插入
         CandNum += xUpdateCandList( uiMode, cost, numModesForFullRD, uiRdModeList, CandCostList );
       }
     
-#if FAST_UDI_USE_MPM
+#if FAST_UDI_USE_MPM // 核心,在CandList中加入MPM预测的模式
       Int uiPreds[3] = {-1, -1, -1};
       Int iMode = -1;
-      Int numCand = pcCU->getIntraDirLumaPredictor( uiPartOffset, uiPreds, &iMode );
+      Int numCand = pcCU->getIntraDirLumaPredictor( uiPartOffset, uiPreds, &iMode ); // 利用左，上PU的模式预测当前PU最可能模式
+      // 貌似得到的Idx和上边CandList中最小的3个一样，巧合？
       if( iMode >= 0 )
       {
         numCand = iMode;
@@ -2519,11 +2523,11 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
         Bool mostProbableModeIncluded = false;
         Int mostProbableMode = uiPreds[j];
         
-        for( Int i=0; i < numModesForFullRD; i++)
+        for( Int i=0; i < numModesForFullRD; i++) //检查预测到的MPM是否在CandLIst最小值中
         {
           mostProbableModeIncluded |= (mostProbableMode == uiRdModeList[i]);
         }
-        if (!mostProbableModeIncluded)
+        if (!mostProbableModeIncluded) //不在则必须添加至CandList最小值之后，最增加候选最值个数
         {
           uiRdModeList[numModesForFullRD++] = mostProbableMode;
         }
@@ -2552,7 +2556,7 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
     {
       // set luma prediction mode
       UInt uiOrgMode = uiRdModeList[uiMode];
-      
+      // 设置所有的Directon模式
       pcCU->setLumaIntraDirSubParts ( uiOrgMode, uiPartOffset, uiDepth + uiInitTrDepth );
       
       // set context models
@@ -2562,8 +2566,8 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
       }
       
       // determine residual for partition
-      UInt   uiPUDistY = 0;
-      UInt   uiPUDistC = 0;
+      UInt   uiPUDistY = 0; // 亮度
+      UInt   uiPUDistC = 0; // 色度
       Double dPUCost   = 0.0;
 #if HHI_RQT_INTRA_SPEEDUP
       xRecurIntraCodingQT( pcCU, uiInitTrDepth, uiPartOffset, bLumaOnly, pcOrgYuv, pcPredYuv, pcResiYuv, uiPUDistY, uiPUDistC, true, dPUCost );
@@ -5753,11 +5757,12 @@ UInt TEncSearch::xUpdateCandList( UInt uiMode, Double uiCost, UInt uiFastCandNum
   
   if( shift!=0 )
   {
-    for(i=1; i<shift; i++)
+    for(i=1; i<shift; i++) // 进行右移位
     {
       CandModeList[ uiFastCandNum-i ] = CandModeList[ uiFastCandNum-1-i ];
       CandCostList[ uiFastCandNum-i ] = CandCostList[ uiFastCandNum-1-i ];
     }
+    // 将值插入对应位置，形成新的已排序数组
     CandModeList[ uiFastCandNum-shift ] = uiMode;
     CandCostList[ uiFastCandNum-shift ] = uiCost;
     return 1;
