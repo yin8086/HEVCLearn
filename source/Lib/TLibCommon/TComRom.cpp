@@ -62,7 +62,7 @@ Void initROM()
   g_aucConvertToBit[ i ] = c;
   
   c=2;
-  for ( i=0; i<MAX_CU_DEPTH; i++ )
+  for ( i=0; i<MAX_CU_DEPTH; i++ ) // 一阶一阶的进行赋值 c = 2 4 8 16 ... 64
   {
     g_auiSigLastScan[0][i] = new UInt[ c*c ];
     g_auiSigLastScan[1][i] = new UInt[ c*c ];
@@ -71,6 +71,7 @@ Void initROM()
 
     c <<= 1;
   }  
+  // 可以输出生成的ZigZag顺序的表以及其他的表
 }
 
 Void destroyROM()
@@ -355,10 +356,11 @@ const UInt g_auiGoRicePrefixLen[5] =
 
 Void initSigLastScan(UInt* pBuffD, UInt* pBuffH, UInt* pBuffV, Int iWidth, Int iHeight)
 {
+  // Diagnal Horizental Vertical Buffers
   const UInt  uiNumScanPos  = UInt( iWidth * iWidth );
   UInt        uiNextScanPos = 0;
 
-  if( iWidth < 16 )
+  if( iWidth < 16 ) // 4x4 8x8
   {
     UInt* pBuffTemp = pBuffD;
     if( iWidth == 8 )
@@ -515,6 +517,6 @@ Int g_quantInterDefault8x8[64] =
 UInt g_scalingListSize   [4] = {16,64,256,1024}; //矩阵元素个数
 UInt g_scalingListSizeX  [4] = { 4, 8, 16,  32}; //矩阵行数
 UInt g_scalingListNum[SCALING_LIST_SIZE_NUM]={6,6,6,2};
-Int  g_eTTable[4] = {0,3,1,2};
+Int  g_eTTable[4] = {0,3,1,2}; //Luma, CHrome, Chrome U, Chrome V
 
 //! \}

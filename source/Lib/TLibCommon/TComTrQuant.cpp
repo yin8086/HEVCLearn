@@ -44,7 +44,7 @@
 
 typedef struct
 {
-  Int    iNNZbeforePos0;
+  Int    iNNZbeforePos0; //0位置后面有几个非0系数
   Double d64CodedLevelandDist; // distortion and level cost only
   Double d64UncodedDist;    // all zero coded block distortion
   Double d64SigCost;
@@ -1022,9 +1022,9 @@ Void TComTrQuant::xQuant( TComDataCU* pcCU,
   else
   {
     const UInt   log2BlockSize   = g_aucConvertToBit[ iWidth ] + 2;
-
+    //根据预测方向获取扫描顺序
     UInt scanIdx = pcCU->getCoefScanIdx(uiAbsPartIdx, iWidth, eTType==TEXT_LUMA, pcCU->isIntra(uiAbsPartIdx));
-    const UInt *scan = g_auiSigLastScan[ scanIdx ][ log2BlockSize - 1 ];
+    const UInt *scan = g_auiSigLastScan[ scanIdx ][ log2BlockSize - 1 ]; //以log2W为索引
     
     Int deltaU[32*32] ;
 
@@ -1067,16 +1067,17 @@ Void TComTrQuant::xQuant( TComDataCU* pcCU,
 #endif
 
     UInt uiLog2TrSize = g_aucConvertToBit[ iWidth ] + 2;
+    // 一般为6个 L,CU,CV, L, CU, CV
     Int scalingListType = (pcCU->isIntra(uiAbsPartIdx) ? 0 : 3) + g_eTTable[(Int)eTType];
     assert(scalingListType < 6);
-    Int *piQuantCoeff = 0;
-    piQuantCoeff = getQuantCoeff(scalingListType,m_cQP.m_iRem,uiLog2TrSize-2);
+    Int *piQuantCoeff = 0; //这个是Q乘法因子矩阵
+    piQuantCoeff = getQuantCoeff(scalingListType,m_cQP.m_iRem,uiLog2TrSize-2); //rem = Qp % 5,索引整合0-3
 
     UInt uiBitDepth = eTType == TEXT_LUMA ? g_bitDepthY : g_bitDepthC;
     Int iTransformShift = MAX_TR_DYNAMIC_RANGE - uiBitDepth - uiLog2TrSize;  // Represents scaling through forward transform
-
+    // iQBits = 15 - BitDepth - log2TrSize + QP/6 + 14 = 21 + QP/6 - log2N ( BD = 8)
     Int iQBits = QUANT_SHIFT + m_cQP.m_iPer + iTransformShift;                // Right shift of non-RDOQ quantizer;  level = (coeff*uiQ + offset)>>q_bits
-
+    // offset = 171 << (iQB - 9)  ||  85 << (iQB - 9)
     iAdd = (pcCU->getSlice()->getSliceType()==I_SLICE ? 171 : 85) << (iQBits-9);
 
 #if ADAPTIVE_QP_SELECTION
@@ -1091,9 +1092,9 @@ Void TComTrQuant::xQuant( TComDataCU* pcCU,
     {
       Int iLevel;
       Int  iSign;
-      UInt uiBlockPos = n;
+      UInt uiBlockPos = n; //一维索引位置
       iLevel  = piCoef[uiBlockPos];
-      iSign   = (iLevel < 0 ? -1: 1);      
+      iSign   = (iLevel < 0 ? -1: 1); //单独取出符号      
 
 #if ADAPTIVE_QP_SELECTION
       Int64 tmpLevel = (Int64)abs(iLevel) * piQuantCoeff[uiBlockPos];
@@ -1104,14 +1105,17 @@ Void TComTrQuant::xQuant( TComDataCU* pcCU,
       iLevel = (Int)((tmpLevel + iAdd ) >> iQBits);
       deltaU[uiBlockPos] = (Int)((tmpLevel - (iLevel<<iQBits) )>> qBits8);
 #else
+      //level = (coeff*uiQ + iAdd)>>q_bits
       iLevel = ((Int64)abs(iLevel) * piQuantCoeff[uiBlockPos] + iAdd ) >> iQBits;
+      // deltaU =  (coff*Q - level<<q_bits) >> (q_bits - 8)
+      //        =  -iAdd >> () = 175/85 * x 大概就是一个误差  
       deltaU[uiBlockPos] = (Int)( ((Int64)abs(piCoef[uiBlockPos]) * piQuantCoeff[uiBlockPos] - (iLevel<<iQBits) )>> qBits8 );
 #endif
-      uiAcSum += iLevel;
-      iLevel *= iSign;        
-      piQCoef[uiBlockPos] = Clip3( -32768, 32767, iLevel );
+      uiAcSum += iLevel; //总值用来RDO
+      iLevel *= iSign;  //最后再加上符号，重构之时 c= sign * (|c|+offset)*s(NURQ,G382)
+      piQCoef[uiBlockPos] = Clip3( -32768, 32767, iLevel ); //剪纸计算
     } // for n
-    if( pcCU->getSlice()->getPPS()->getSignHideFlag() )
+    if( pcCU->getSlice()->getPPS()->getSignHideFlag() ) //一般为0
     {
       if(uiAcSum>=2)
       {
@@ -1546,28 +1550,28 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
                                                       TextType                        eTType,
                                                       UInt                            uiAbsPartIdx )
 {
-  Int    iQBits      = m_cQP.m_iBits;
+  Int    iQBits      = m_cQP.m_iBits; // 15 + QP/6
   Double dTemp       = 0;
   UInt uiLog2TrSize = g_aucConvertToBit[ uiWidth ] + 2;
-  Int uiQ = g_quantScales[m_cQP.rem()];
+  Int uiQ = g_quantScales[m_cQP.rem()]; // 取出Q乘法因子
   
   UInt uiBitDepth = eTType == TEXT_LUMA ? g_bitDepthY : g_bitDepthC;
-  Int iTransformShift = MAX_TR_DYNAMIC_RANGE - uiBitDepth - uiLog2TrSize;  // Represents scaling through forward transform
+  Int iTransformShift = MAX_TR_DYNAMIC_RANGE - uiBitDepth - uiLog2TrSize;  // 15-BD-M Represents scaling through forward transform 
   UInt       uiGoRiceParam       = 0;
   Double     d64BlockUncodedCost = 0;
   const UInt uiLog2BlkSize       = g_aucConvertToBit[ uiWidth ] + 2;
   const UInt uiMaxNumCoeff       = uiWidth * uiHeight;
-  Int scalingListType = (pcCU->isIntra(uiAbsPartIdx) ? 0 : 3) + g_eTTable[(Int)eTType];
+  Int scalingListType = (pcCU->isIntra(uiAbsPartIdx) ? 0 : 3) + g_eTTable[(Int)eTType];//L CU CV L CU CV
   assert(scalingListType < 6);
   
-  iQBits = QUANT_SHIFT + m_cQP.m_iPer + iTransformShift;                   // Right shift of non-RDOQ quantizer;  level = (coeff*uiQ + offset)>>q_bits
+  iQBits = QUANT_SHIFT + m_cQP.m_iPer + iTransformShift;// = 15+14+QP/6-BD-M    // Right shift of non-RDOQ quantizer;  level = (coeff*uiQ + offset)>>q_bits
   Double dErrScale   = 0;
-  Double *pdErrScaleOrg = getErrScaleCoeff(scalingListType,uiLog2TrSize-2,m_cQP.m_iRem);
-  Int *piQCoefOrg = getQuantCoeff(scalingListType,m_cQP.m_iRem,uiLog2TrSize-2);
+  Double *pdErrScaleOrg = getErrScaleCoeff(scalingListType,uiLog2TrSize-2,m_cQP.m_iRem); //offset表?
+  Int *piQCoefOrg = getQuantCoeff(scalingListType,m_cQP.m_iRem,uiLog2TrSize-2);// 这个是Q因子表
   Int *piQCoef = piQCoefOrg;
   Double *pdErrScale = pdErrScaleOrg;
 #if ADAPTIVE_QP_SELECTION
-  Int iQBitsC = iQBits - ARL_C_PRECISION;
+  Int iQBitsC = iQBits - ARL_C_PRECISION; // 29 + QP/6 - BD - M - 7
   Int iAddC =  1 << (iQBitsC-1);
 #endif
   UInt uiScanIdx = pcCU->getCoefScanIdx(uiAbsPartIdx, uiWidth, eTType==TEXT_LUMA, pcCU->isIntra(uiAbsPartIdx));
@@ -1579,8 +1583,8 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
   Double pdCostCoeff [ 32 * 32 ];
   Double pdCostSig   [ 32 * 32 ];
   Double pdCostCoeff0[ 32 * 32 ];
-  ::memset( pdCostCoeff, 0, sizeof(Double) *  uiMaxNumCoeff );
-  ::memset( pdCostSig,   0, sizeof(Double) *  uiMaxNumCoeff );
+  ::memset( pdCostCoeff, 0, sizeof(Double) *  uiMaxNumCoeff ); // 目标系数绝对值
+  ::memset( pdCostSig,   0, sizeof(Double) *  uiMaxNumCoeff );// 目标系数符号
   Int rateIncUp   [ 32 * 32 ];
   Int rateIncDown [ 32 * 32 ];
   Int sigRateDelta[ 32 * 32 ];
@@ -1590,22 +1594,33 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
   ::memset( sigRateDelta, 0, sizeof(Int) *  uiMaxNumCoeff );
   ::memset( deltaU,       0, sizeof(Int) *  uiMaxNumCoeff );
   
-  const UInt * scanCG;
-  {
+  const UInt * scanCG; //这个是Coeff Group的扫描顺序矩阵
+  {//核心就是找到正确的扫描顺序矩阵
+    // > 3 （16,32) 则减去3,4x4,8x8，以4x4块作为单位。<3则直接为0，即2x2
     scanCG = g_auiSigLastScan[ uiScanIdx ][ uiLog2BlkSize > 3 ? uiLog2BlkSize-2-1 : 0  ];
-    if( uiLog2BlkSize == 3 )
+    if( uiLog2BlkSize == 3 ) //8x8
     {
-      scanCG = g_sigLastScan8x8[ uiScanIdx ];
+      scanCG = g_sigLastScan8x8[ uiScanIdx ]; //实际上是2x2的Zigzag顺序
     }
-    else if( uiLog2BlkSize == 5 )
+    else if( uiLog2BlkSize == 5 ) //32x32
     {
-      scanCG = g_sigLastScanCG32x32;
+      scanCG = g_sigLastScanCG32x32; //实际上就是标准8x8的Zigzag顺序
     }
   }
-  const UInt uiCGSize = (1 << MLS_CG_SIZE);         // 16
+
+  for(int i = 0; i < 8; i++)
+  {
+    for(int j = 0; j < 8; j++)
+    {
+      std::cout.width(3);
+      std::cout<<g_sigLastScanCG32x32[i*8 + j];
+    }
+    std::cout<<endl;
+  }
+  const UInt uiCGSize = (1 << MLS_CG_SIZE);         // 16 Group大小即4x4
   Double pdCostCoeffGroupSig[ MLS_GRP_NUM ];
   UInt uiSigCoeffGroupFlag[ MLS_GRP_NUM ];
-  UInt uiNumBlkSide = uiWidth / MLS_CG_SIZE;
+  UInt uiNumBlkSide = uiWidth / MLS_CG_SIZE; // Wid / 4 就是行列上Coeff Group个数
   Int iCGLastScanPos = -1;
   
   UInt    uiCtxSet            = 0;
@@ -1619,62 +1634,64 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
   UInt    c2Idx     = 0;
   Int     baseLevel;
   
-  const UInt *scan = g_auiSigLastScan[ uiScanIdx ][ uiLog2BlkSize - 1 ];
+  const UInt *scan = g_auiSigLastScan[ uiScanIdx ][ uiLog2BlkSize - 1 ]; // 正常扫描顺序
   
   ::memset( pdCostCoeffGroupSig,   0, sizeof(Double) * MLS_GRP_NUM );
   ::memset( uiSigCoeffGroupFlag,   0, sizeof(UInt) * MLS_GRP_NUM );
   
-  UInt uiCGNum = uiWidth * uiHeight >> MLS_CG_SIZE;
+  UInt uiCGNum = uiWidth * uiHeight >> MLS_CG_SIZE; //所有快均划分为一堆4x4块
   Int iScanPos;
   coeffGroupRDStats rdStats;     
   
-  for (Int iCGScanPos = uiCGNum-1; iCGScanPos >= 0; iCGScanPos--)
+  for (Int iCGScanPos = uiCGNum-1; iCGScanPos >= 0; iCGScanPos--) //扫描CoeffGroup，倒序
   {
     UInt uiCGBlkPos = scanCG[ iCGScanPos ];
-    UInt uiCGPosY   = uiCGBlkPos / uiNumBlkSide;
-    UInt uiCGPosX   = uiCGBlkPos - (uiCGPosY * uiNumBlkSide);
+    UInt uiCGPosY   = uiCGBlkPos / uiNumBlkSide; //第几行，Y
+    UInt uiCGPosX   = uiCGBlkPos - (uiCGPosY * uiNumBlkSide); // 第几列, X
     ::memset( &rdStats, 0, sizeof (coeffGroupRDStats));
-    
+    //填充当前CoeffFlag，其值为(XX)(二进制),高位代表其下面元素非零，低位代表其右边元素非零
     const Int patternSigCtx = TComTrQuant::calcPatternSigCtx(uiSigCoeffGroupFlag, uiCGPosX, uiCGPosY, uiWidth, uiHeight);
-    for (Int iScanPosinCG = uiCGSize-1; iScanPosinCG >= 0; iScanPosinCG--)
+    for (Int iScanPosinCG = uiCGSize-1; iScanPosinCG >= 0; iScanPosinCG--) //在CG内部4x4扫描，逆序
     {
-      iScanPos = iCGScanPos*uiCGSize + iScanPosinCG;
+      iScanPos = iCGScanPos*uiCGSize + iScanPosinCG; //以像素为单位的索引,Raster
       //===== quantization =====
-      UInt    uiBlkPos          = scan[iScanPos];
+      UInt    uiBlkPos          = scan[iScanPos]; //这个是Zigzag扫描顺序
       // set coeff
-      uiQ  = piQCoef[uiBlkPos];
-      dTemp = pdErrScale[uiBlkPos];
-      Int lLevelDouble          = plSrcCoeff[ uiBlkPos ];
+      uiQ  = piQCoef[uiBlkPos]; //Q乘法因子
+      dTemp = pdErrScale[uiBlkPos]; //offset？
+      Int lLevelDouble          = plSrcCoeff[ uiBlkPos ]; // 变换后的系数
+      //min(coeff*Q, MAX_INT-2^iQBits)
       lLevelDouble              = (Int)min<Int64>((Int64)abs((Int)lLevelDouble) * uiQ , MAX_INT - (1 << (iQBits - 1)));
 #if ADAPTIVE_QP_SELECTION
-      if( m_bUseAdaptQpSelect )
+      if( m_bUseAdaptQpSelect ) //进行调整后计算
       {
         piArlDstCoeff[uiBlkPos]   = (Int)(( lLevelDouble + iAddC) >> iQBitsC );
       }
 #endif
+      // MaxAbsLev = (coeff*Q) >> iQBits + 1/2 传说中的无脑进位，最大可能量化到的level
       UInt uiMaxAbsLevel        = (lLevelDouble + (1 << (iQBits - 1))) >> iQBits;
       
       Double dErr               = Double( lLevelDouble );
-      pdCostCoeff0[ iScanPos ]  = dErr * dErr * dTemp;
+      pdCostCoeff0[ iScanPos ]  = dErr * dErr * dTemp; //设置好 dErr ^2 * ErrScale
       d64BlockUncodedCost      += pdCostCoeff0[ iScanPos ];
-      piDstCoeff[ uiBlkPos ]    = uiMaxAbsLevel;
+      piDstCoeff[ uiBlkPos ]    = uiMaxAbsLevel; // 目标系数为这个
       
-      if ( uiMaxAbsLevel > 0 && iLastScanPos < 0 )
+      if ( uiMaxAbsLevel > 0 && iLastScanPos < 0 ) //我是最后一个非0系数
       {
-        iLastScanPos            = iScanPos;
-        uiCtxSet                = (iScanPos < SCAN_SET_SIZE || eTType!=TEXT_LUMA) ? 0 : 2;
-        iCGLastScanPos          = iCGScanPos;
+        iLastScanPos            = iScanPos; //设置最后一个非0系数位置 (Raster像素)
+        uiCtxSet                = (iScanPos < SCAN_SET_SIZE || eTType!=TEXT_LUMA) ? 0 : 2; //Chroma或第0组内为0，否则为2
+        iCGLastScanPos          = iCGScanPos; // 设置位于哪个组
       }
       
-      if ( iLastScanPos >= 0 )
+      if ( iLastScanPos >= 0 ) // 已经有了最后一个非0系数的位置
       {
         //===== coefficient level estimation =====
         UInt  uiLevel;
-        UInt  uiOneCtx         = 4 * uiCtxSet + c1;
-        UInt  uiAbsCtx         = uiCtxSet + c2;
+        UInt  uiOneCtx         = 4 * uiCtxSet + c1; // 1 || 9，10,11
+        UInt  uiAbsCtx         = uiCtxSet + c2;// 0 || 2
         
-        if( iScanPos == iLastScanPos )
-        {
+        if( iScanPos == iLastScanPos ) //刚刚设置为最后非0系数
+        {//得到最好的系数
           uiLevel              = xGetCodedLevel( pdCostCoeff[ iScanPos ], pdCostCoeff0[ iScanPos ], pdCostSig[ iScanPos ], 
                                                 lLevelDouble, uiMaxAbsLevel, 0, uiOneCtx, uiAbsCtx, uiGoRiceParam, 
                                                 c1Idx, c2Idx, iQBits, dTemp, 1 );
@@ -1689,9 +1706,9 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
                                                 c1Idx, c2Idx, iQBits, dTemp, 0 );
           sigRateDelta[ uiBlkPos ] = m_pcEstBitsSbac->significantBits[ uiCtxSig ][ 1 ] - m_pcEstBitsSbac->significantBits[ uiCtxSig ][ 0 ];
         }
-        deltaU[ uiBlkPos ]        = (lLevelDouble - ((Int)uiLevel << iQBits)) >> (iQBits-8);
-        if( uiLevel > 0 )
-        {
+        deltaU[ uiBlkPos ]        = (lLevelDouble - ((Int)uiLevel << iQBits)) >> (iQBits-8); // 误差>>(iQB-8)
+        if( uiLevel > 0 ) //填充RateIncUp以及RateIncDown两个表，计算量化不同带来的码率变化
+        { //xGetICRate实际上就是获取估计编码bits的函数。分别计算往上量化，以及往下量化导致的bits变化
           Int rateNow = xGetICRate( uiLevel, uiOneCtx, uiAbsCtx, uiGoRiceParam, c1Idx, c2Idx );
           rateIncUp   [ uiBlkPos ] = xGetICRate( uiLevel+1, uiOneCtx, uiAbsCtx, uiGoRiceParam, c1Idx, c2Idx ) - rateNow;
           rateIncDown [ uiBlkPos ] = xGetICRate( uiLevel-1, uiOneCtx, uiAbsCtx, uiGoRiceParam, c1Idx, c2Idx ) - rateNow;
@@ -1700,11 +1717,11 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
         {
           rateIncUp   [ uiBlkPos ] = m_pcEstBitsSbac->m_greaterOneBits[ uiOneCtx ][ 0 ];
         }
-        piDstCoeff[ uiBlkPos ] = uiLevel;
+        piDstCoeff[ uiBlkPos ] = uiLevel; //设置level
         d64BaseCost           += pdCostCoeff [ iScanPos ];
         
         
-        baseLevel = (c1Idx < C1FLAG_NUMBER) ? (2 + (c2Idx < C2FLAG_NUMBER)) : 1;
+        baseLevel = (c1Idx < C1FLAG_NUMBER) ? (2 + (c2Idx < C2FLAG_NUMBER)) : 1; // 3/2/1
         if( uiLevel >= baseLevel )
         {
           if(uiLevel  > 3*(1<<uiGoRiceParam))
@@ -1712,25 +1729,25 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
             uiGoRiceParam = min<UInt>(uiGoRiceParam+ 1, 4);
           }
         }
-        if ( uiLevel >= 1)
+        if ( uiLevel >= 1) //c1Idx这里可以看出来就是 >=1 level的个数
         {
           c1Idx ++;
         }
         
-        //===== update bin model =====
+        //===== update bin model =====   c1 c2未知
         if( uiLevel > 1 )
         {
           c1 = 0; 
           c2 += (c2 < 2);
           c2Idx ++;
         }
-        else if( (c1 < 3) && (c1 > 0) && uiLevel)
+        else if( (c1 < 3) && (c1 > 0) && uiLevel) // c1 = 1,2时候且为非0系数则 c1 ++
         {
           c1++;
         }
         
         //===== context set update =====
-        if( ( iScanPos % SCAN_SET_SIZE == 0 ) && ( iScanPos > 0 ) )
+        if( ( iScanPos % SCAN_SET_SIZE == 0 ) && ( iScanPos > 0 ) ) // 非第一个CG的首个
         {
           c2                = 0;
           uiGoRiceParam     = 0;
@@ -1747,26 +1764,26 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
       }
       else
       {
-        d64BaseCost    += pdCostCoeff0[ iScanPos ];
+        d64BaseCost    += pdCostCoeff0[ iScanPos ]; // = Coeff(经过level选择而得到的RDOQ的J损耗) + Coeff0(=level ^2 * errScale 原始估计的未编码损耗)
       }
       rdStats.d64SigCost += pdCostSig[ iScanPos ];
-      if (iScanPosinCG == 0 )
+      if (iScanPosinCG == 0 ) //每一个CG组的首个元素
       {
         rdStats.d64SigCost_0 = pdCostSig[ iScanPos ];
       }
-      if (piDstCoeff[ uiBlkPos ] )
+      if (piDstCoeff[ uiBlkPos ] ) //非0
       {
-        uiSigCoeffGroupFlag[ uiCGBlkPos ] = 1;
-        rdStats.d64CodedLevelandDist += pdCostCoeff[ iScanPos ] - pdCostSig[ iScanPos ];
-        rdStats.d64UncodedDist += pdCostCoeff0[ iScanPos ];
+        uiSigCoeffGroupFlag[ uiCGBlkPos ] = 1; //将当前CG设为有非0系数存在
+        rdStats.d64CodedLevelandDist += pdCostCoeff[ iScanPos ] - pdCostSig[ iScanPos ];//已编码Cost
+        rdStats.d64UncodedDist += pdCostCoeff0[ iScanPos ];//未编码Cost
         if ( iScanPosinCG != 0 )
         {
-          rdStats.iNNZbeforePos0++;
+          rdStats.iNNZbeforePos0++; //0位置后面有几个非0系数
         }
       }
     } //end for (iScanPosinCG)
     
-    if (iCGLastScanPos >= 0) 
+    if (iCGLastScanPos >= 0) //已经找到最后一个非0位置了
     {
       if( iCGScanPos )
       {
@@ -2061,22 +2078,22 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
  */
 Int  TComTrQuant::calcPatternSigCtx( const UInt* sigCoeffGroupFlag, UInt posXCG, UInt posYCG, Int width, Int height )
 {
-  if( width == 4 && height == 4 ) return -1;
+  if( width == 4 && height == 4 ) return -1; //不分组，就不用看了
 
   UInt sigRight = 0;
   UInt sigLower = 0;
 
-  width >>= 2;
+  width >>= 2; //调整到以CoeffGroup为单位
   height >>= 2;
-  if( posXCG < width - 1 )
+  if( posXCG < width - 1 ) //非每一行最后一个，则获取其右边元素是否非零
   {
     sigRight = (sigCoeffGroupFlag[ posYCG * width + posXCG + 1 ] != 0);
   }
-  if (posYCG < height - 1 )
+  if (posYCG < height - 1 ) //非每一列最后一个，则获取其下边元素是否非零
   {
     sigLower = (sigCoeffGroupFlag[ (posYCG  + 1 ) * width + posXCG ] != 0);
   }
-  return sigRight + (sigLower<<1);
+  return sigRight + (sigLower<<1); // 组成一个2位的标志数,XX，分别代表“下右”存在否
 }
 
 /** Context derivation process of coeff_abs_significant_flag
@@ -2106,12 +2123,12 @@ Int TComTrQuant::getSigCtxInc    (
     7, 7, 8, 8
   };
 
-  if( posX + posY == 0 )
+  if( posX + posY == 0 ) // 0,0位置返回0
   {
     return 0;
   }
 
-  if ( log2BlockSize == 2 )
+  if ( log2BlockSize == 2 ) // 4x4
   {
     return ctxIndMap[ 4 * posY + posX ];
   }
@@ -2171,11 +2188,11 @@ __inline UInt TComTrQuant::xGetCodedLevel ( Double&                         rd64
                                             Int                             iQBits,
                                             Double                          dTemp,
                                             Bool                            bLast        ) const
-{
+{// 貌似根据RD选取最优的Level
   Double dCurrCostSig   = 0; 
   UInt   uiBestAbsLevel = 0;
   
-  if( !bLast && uiMaxAbsLevel < 3 )
+  if( !bLast && uiMaxAbsLevel < 3 ) //非最后一个且 < 3
   {
     rd64CodedCostSig    = xGetRateSigCoef( 0, ui16CtxNumSig ); 
     rd64CodedCost       = rd64CodedCost0 + rd64CodedCostSig;
@@ -2186,7 +2203,7 @@ __inline UInt TComTrQuant::xGetCodedLevel ( Double&                         rd64
   }
   else
   {
-    rd64CodedCost       = MAX_DOUBLE;
+    rd64CodedCost       = MAX_DOUBLE; //设置为最大Cost
   }
 
   if( !bLast )
@@ -2194,10 +2211,11 @@ __inline UInt TComTrQuant::xGetCodedLevel ( Double&                         rd64
     dCurrCostSig        = xGetRateSigCoef( 1, ui16CtxNumSig );
   }
 
-  UInt uiMinAbsLevel    = ( uiMaxAbsLevel > 1 ? uiMaxAbsLevel - 1 : 1 );
-  for( Int uiAbsLevel  = uiMaxAbsLevel; uiAbsLevel >= uiMinAbsLevel ; uiAbsLevel-- )
-  {
-    Double dErr         = Double( lLevelDouble  - ( uiAbsLevel << iQBits ) );
+  UInt uiMinAbsLevel    = ( uiMaxAbsLevel > 1 ? uiMaxAbsLevel - 1 : 1 ); //最小Level，只可能比x小1
+  for( Int uiAbsLevel  = uiMaxAbsLevel; uiAbsLevel >= uiMinAbsLevel ; uiAbsLevel-- ) //对最多两个Level分别
+  { //循环计算各个J，然后选择其中最小的设置
+    Double dErr         = Double( lLevelDouble  - ( uiAbsLevel << iQBits ) ); //与直接 逆运算结果的误差
+    //这里 VCEG AH21 为 J = Error(= err ^ 2 * errScale) + lambda * bits
     Double dCurrCost    = dErr * dErr * dTemp + xGetICRateCost( uiAbsLevel, ui16CtxNumOne, ui16CtxNumAbs, ui16AbsGoRice, c1Idx, c2Idx );
     dCurrCost          += dCurrCostSig;
 
@@ -2228,7 +2246,7 @@ __inline Double TComTrQuant::xGetICRateCost  ( UInt                            u
                                                ) const
 {
   Double iRate = xGetIEPRate();
-  UInt baseLevel  =  (c1Idx < C1FLAG_NUMBER)? (2 + (c2Idx < C2FLAG_NUMBER)) : 1;
+  UInt baseLevel  =  (c1Idx < C1FLAG_NUMBER)? (2 + (c2Idx < C2FLAG_NUMBER)) : 1; // 3（大于1大于2的都在范围内） || 2 (1在2不在）|| 1（都不在）
 
   if ( uiAbsLevel >= baseLevel )
   {    
@@ -2283,9 +2301,9 @@ __inline Int TComTrQuant::xGetICRate  ( UInt                            uiAbsLev
                                      , UInt                            c1Idx,
                                        UInt                            c2Idx
                                        ) const
-{
+{ //跟ICRateCost前半部分类似，不过貌似加入了指数哥伦布编码部分
   Int iRate = 0;
-  UInt baseLevel  =  (c1Idx < C1FLAG_NUMBER)? (2 + (c2Idx < C2FLAG_NUMBER)) : 1;
+  UInt baseLevel  =  (c1Idx < C1FLAG_NUMBER)? (2 + (c2Idx < C2FLAG_NUMBER)) : 1;  // 3（大于1大于2的都在范围内） || 2 (1在2不在）|| 1（都不在）
 
   if ( uiAbsLevel >= baseLevel )
   {

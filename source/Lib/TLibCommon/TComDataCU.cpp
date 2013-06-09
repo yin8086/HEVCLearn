@@ -3427,13 +3427,13 @@ UInt TComDataCU::getCoefScanIdx(UInt uiAbsPartIdx, UInt uiWidth, Bool bIsLuma, B
   UInt uiScanIdx;
   UInt uiDirMode;
 
-  if ( !bIsIntra ) 
+  if ( !bIsIntra ) //非帧内
   {
     uiScanIdx = SCAN_DIAG;
     return uiScanIdx;
   }
 
-  switch(uiWidth)
+  switch(uiWidth) //根据大小设置
   {
     case  2: uiCTXIdx = 6; break;
     case  4: uiCTXIdx = 5; break;
@@ -3444,16 +3444,17 @@ UInt TComDataCU::getCoefScanIdx(UInt uiAbsPartIdx, UInt uiWidth, Bool bIsLuma, B
     default: uiCTXIdx = 0; break;
   }
 
-  if ( bIsLuma )
+  if ( bIsLuma ) //亮度
   {
-    uiDirMode = getLumaIntraDir(uiAbsPartIdx);
+    uiDirMode = getLumaIntraDir(uiAbsPartIdx); //得到预测方向
     uiScanIdx = SCAN_DIAG;
-    if (uiCTXIdx >3 && uiCTXIdx < 6) //if multiple scans supported for transform size
+    if (uiCTXIdx >3 && uiCTXIdx < 6) //if multiple scans supported for transform size 4x4 8x8
     {
+      //选取与对应角度相近的扫描角度
       uiScanIdx = abs((Int) uiDirMode - VER_IDX) < 5 ? SCAN_HOR : (abs((Int)uiDirMode - HOR_IDX) < 5 ? SCAN_VER : SCAN_DIAG);
     }
   }
-  else
+  else //根据Chroma的预测方向设置扫描顺序
   {
     uiDirMode = getChromaIntraDir(uiAbsPartIdx);
     if( uiDirMode == DM_CHROMA_IDX )
