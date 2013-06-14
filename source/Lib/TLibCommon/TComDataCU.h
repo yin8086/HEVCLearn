@@ -132,7 +132,7 @@ private:
   Char*         m_pePredMode;         ///< array of prediction modes
   Bool*         m_CUTransquantBypass;   ///< array of cu_transquant_bypass flags
   Char*         m_phQP;               ///< array of QP values
-  UChar*        m_puhTrIdx;           ///< array of transform indices
+  UChar*        m_puhTrIdx;           ///< array of transform indices ,对应TU划分的深度
   UChar*        m_puhTransformSkip[3];///< array of transform skipping flags
   UChar*        m_puhCbf[3];          ///< array of coded block flags (CBF)
   TComCUMvField m_acCUMvField[2];     ///< array of motion vectors

@@ -1009,7 +1009,7 @@ TEncSearch::xIntraCodingLumaBlk( TComDataCU* pcCU,
                                 TComYuv*    pcResiYuv, 
                                 UInt&       ruiDist,
                                 Int        default0Save1Load2 ) //针对Luma的Blk进行帧内编码
-{
+{ //预测，计算残差，变换，量化，反量化，反变换，计算SSE Distor
   UInt    uiLumaPredMode    = pcCU     ->getLumaIntraDir     ( uiAbsPartIdx );
   UInt    uiFullDepth       = pcCU     ->getDepth   ( 0 )  + uiTrDepth;
   UInt    uiWidth           = pcCU     ->getWidth   ( 0 ) >> uiTrDepth;
@@ -1115,7 +1115,7 @@ TEncSearch::xIntraCodingLumaBlk( TComDataCU* pcCU,
 #endif
     uiWidth, uiHeight, uiAbsSum, TEXT_LUMA, uiAbsPartIdx,useTransformSkip );
   
-  //--- set coded block flag ---
+  //--- set coded block flag --- 第i位对应深度i的TU，值为0，则全为0的块
   pcCU->setCbfSubParts          ( ( uiAbsSum ? 1 : 0 ) << uiTrDepth, TEXT_LUMA, uiAbsPartIdx, uiFullDepth );
   //--- inverse transform ---
   if( uiAbsSum )
@@ -1124,7 +1124,7 @@ TEncSearch::xIntraCodingLumaBlk( TComDataCU* pcCU,
     assert(scalingListType < 6);
     m_pcTrQuant->invtransformNxN( pcCU->getCUTransquantBypass(uiAbsPartIdx), TEXT_LUMA,pcCU->getLumaIntraDir( uiAbsPartIdx ), piResi, uiStride, pcCoeff, uiWidth, uiHeight, scalingListType, useTransformSkip );
   }
-  else
+  else //直接全设置为0
   {
     Pel* pResi = piResi;
     memset( pcCoeff, 0, sizeof( TCoeff ) * uiWidth * uiHeight );
@@ -1137,16 +1137,16 @@ TEncSearch::xIntraCodingLumaBlk( TComDataCU* pcCU,
   
   //===== reconstruction =====
   {
-    Pel* pPred      = piPred;
-    Pel* pResi      = piResi;
-    Pel* pReco      = piReco;
-    Pel* pRecQt     = piRecQt;
-    Pel* pRecIPred  = piRecIPred;
+    Pel* pPred      = piPred; //预测
+    Pel* pResi      = piResi; //残差
+    Pel* pReco      = piReco; //原始重构
+    Pel* pRecQt     = piRecQt; //Layer貌似？
+    Pel* pRecIPred  = piRecIPred; //参考用重构？
     for( UInt uiY = 0; uiY < uiHeight; uiY++ )
     {
       for( UInt uiX = 0; uiX < uiWidth; uiX++ )
       {
-        pReco    [ uiX ] = ClipY( pPred[ uiX ] + pResi[ uiX ] );
+        pReco    [ uiX ] = ClipY( pPred[ uiX ] + pResi[ uiX ] ); // 预测+残差值
         pRecQt   [ uiX ] = pReco[ uiX ];
         pRecIPred[ uiX ] = pReco[ uiX ];
       }
@@ -1436,7 +1436,7 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
   {
     checkTransformSkip       &= (pcCU->getPartitionSize(uiAbsPartIdx)==SIZE_NxN);
   }// 完成一系列条件匹配才会进行Skip设置
-  if( bCheckFull ) //不划分块
+  if( bCheckFull ) //直接不分块进行变换，结果RD放于dSingCost
   {
     if(checkTransformSkip == true) //直接Skip模式，不再变换?
     {
@@ -1578,7 +1578,7 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
         uiSingleCbfY = pcCU->getCbf( uiAbsPartIdx, TEXT_LUMA, uiTrDepth );
       }
       //----- code chroma blocks with given intra prediction mode and store Cbf-----
-      if( !bLumaOnly )
+      if( !bLumaOnly ) // 默认为true，即Luma和Chroma是分开的
       {
         pcCU ->setTransformSkipSubParts ( 0, TEXT_CHROMA_U, uiAbsPartIdx, uiFullDepth ); 
         pcCU ->setTransformSkipSubParts ( 0, TEXT_CHROMA_V, uiAbsPartIdx, uiFullDepth ); 
@@ -1598,11 +1598,12 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
         uiSingleBits=uiSingleBits*4; 
       }
 #endif
+      // RDCost = SSE+lambda*Bits+0.5
       dSingleCost       = m_pcRdCost->calcRdCost( uiSingleBits, uiSingleDistY + uiSingleDistC );
     }
   }
   
-  if( bCheckSplit ) // 进行划分
+  if( bCheckSplit ) // 进行划分,结果放于dSplitCost中
   {
     //----- store full entropy coding status, load original entropy coding status -----
     if( m_bUseSBACRD )
@@ -1621,7 +1622,7 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
     Double  dSplitCost      = 0.0;
     UInt    uiSplitDistY    = 0;
     UInt    uiSplitDistC    = 0;
-    UInt    uiQPartsDiv     = pcCU->getPic()->getNumPartInCU() >> ( ( uiFullDepth + 1 ) << 1 );// 256 -> 64 * 4, 64 -> 32
+    UInt    uiQPartsDiv     = pcCU->getPic()->getNumPartInCU() >> ( ( uiFullDepth + 1 ) << 1 );// 256 -> 64 * 4, 64 -> 32 ，一个小TU里面几个4x4块
     UInt    uiAbsPartIdxSub = uiAbsPartIdx;
 
     UInt    uiSplitCbfY = 0;
@@ -1635,8 +1636,8 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
 #else
       xRecurIntraCodingQT( pcCU, uiTrDepth + 1, uiAbsPartIdxSub, bLumaOnly, pcOrgYuv, pcPredYuv, pcResiYuv, uiSplitDistY, uiSplitDistC, dSplitCost );
 #endif
-
-      uiSplitCbfY |= pcCU->getCbf( uiAbsPartIdxSub, TEXT_LUMA, uiTrDepth + 1 );
+      // 获取CBf，即i位，表示i深度TU，0表示全0块
+      uiSplitCbfY |= pcCU->getCbf( uiAbsPartIdxSub, TEXT_LUMA, uiTrDepth + 1 ); //小块有一个1就是1
       if(!bLumaOnly)
       {
         uiSplitCbfU |= pcCU->getCbf( uiAbsPartIdxSub, TEXT_CHROMA_U, uiTrDepth + 1 );
@@ -1644,7 +1645,7 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
       }
     }
 
-    for( UInt uiOffs = 0; uiOffs < 4 * uiQPartsDiv; uiOffs++ )
+    for( UInt uiOffs = 0; uiOffs < 4 * uiQPartsDiv; uiOffs++ ) //所有4x4块。设置当前层的CBF
     {
       pcCU->getCbf( TEXT_LUMA )[ uiAbsPartIdx + uiOffs ] |= ( uiSplitCbfY << uiTrDepth );
     }
@@ -1663,10 +1664,10 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
     }
     //----- determine rate and r-d cost -----
     UInt uiSplitBits = xGetIntraBitsQT( pcCU, uiTrDepth, uiAbsPartIdx, true, !bLumaOnly, false );
-    dSplitCost       = m_pcRdCost->calcRdCost( uiSplitBits, uiSplitDistY + uiSplitDistC );
+    dSplitCost       = m_pcRdCost->calcRdCost( uiSplitBits, uiSplitDistY + uiSplitDistC ); // 每一层会利用上一次的Dist总和来计算当前层的RDCost,下层计算的RDCost被废弃
     
     //===== compare and set best =====
-    if( dSplitCost < dSingleCost )
+    if( dSplitCost < dSingleCost ) //小于不划分的Cost则重设(当CheckFirst为假才起到实际作用)
     {
       //--- update cost ---
       ruiDistY += uiSplitDistY;
@@ -1674,6 +1675,7 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
       dRDCost  += dSplitCost;
       return;
     }
+    //下面是在不划分比较好的情况下，则应将重构图像重新复制，因为Split时候被覆盖了
     //----- set entropy coding status -----
     if( m_bUseSBACRD )
     {
@@ -1734,7 +1736,7 @@ TEncSearch::xRecurIntraCodingQT( TComDataCU*  pcCU,
       }
     }
   }
-  ruiDistY += uiSingleDistY;
+  ruiDistY += uiSingleDistY; // Distore累加 SSE
   ruiDistC += uiSingleDistC;
   dRDCost  += dSingleCost;
 }
@@ -2576,13 +2578,13 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
 #endif
       
       // check r-d cost
-      if( dPUCost < dBestPUCost )
+      if( dPUCost < dBestPUCost ) //实际RD比较小的话，可以采用
       {
 #if HHI_RQT_INTRA_SPEEDUP_MOD
         uiSecondBestMode  = uiBestPUMode;
         dSecondBestPUCost = dBestPUCost;
 #endif
-        uiBestPUMode  = uiOrgMode;
+        uiBestPUMode  = uiOrgMode; //将最优模式，以及Dist设置好
         uiBestPUDistY = uiPUDistY;
         uiBestPUDistC = uiPUDistC;
         dBestPUCost   = dPUCost;
@@ -2619,10 +2621,10 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
         break;
       }
 #else
-      UInt uiOrgMode = uiBestPUMode;
+      UInt uiOrgMode = uiBestPUMode; //取出最佳预测模式，通过PU当初TU一样大小获得
 #endif
       
-      pcCU->setLumaIntraDirSubParts ( uiOrgMode, uiPartOffset, uiDepth + uiInitTrDepth );
+      pcCU->setLumaIntraDirSubParts ( uiOrgMode, uiPartOffset, uiDepth + uiInitTrDepth ); //设置Mode
       
       // set context models
       if( m_bUseSBACRD )
@@ -2634,10 +2636,11 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
       UInt   uiPUDistY = 0;
       UInt   uiPUDistC = 0;
       Double dPUCost   = 0.0;
+      //bCheckFirst = false不再将 PU当初TU一样大小了
       xRecurIntraCodingQT( pcCU, uiInitTrDepth, uiPartOffset, bLumaOnly, pcOrgYuv, pcPredYuv, pcResiYuv, uiPUDistY, uiPUDistC, false, dPUCost );
       
       // check r-d cost
-      if( dPUCost < dBestPUCost )
+      if( dPUCost < dBestPUCost ) //比First一遍中的最小Cost还小的好，设置好
       {
         uiBestPUMode  = uiOrgMode;
         uiBestPUDistY = uiPUDistY;
@@ -2734,7 +2737,7 @@ TEncSearch::estIntraPredQT( TComDataCU* pcCU,
   } // PU loop
   
   
-  if( uiNumPU > 1 )
+  if( uiNumPU > 1 ) //多与1个PU
   { // set Cbf for all blocks
     UInt uiCombCbfY = 0;
     UInt uiCombCbfU = 0;

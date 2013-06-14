@@ -61,7 +61,7 @@ Double TComRdCost::calcRdCost( UInt uiBits, UInt uiDistortion, Bool bFlag, DFunc
   Double dRdCost = 0.0;
   Double dLambda = 0.0;
   
-  switch ( eDFunc )
+  switch ( eDFunc ) // = 默认为DF_DEFAULT
   {
     case DF_SSE:
       assert(0);
@@ -80,7 +80,7 @@ Double TComRdCost::calcRdCost( UInt uiBits, UInt uiDistortion, Bool bFlag, DFunc
       break;
   }
   
-  if (bFlag)
+  if (bFlag) // 默认为false
   {
     // Intra8x8, Intra4x4 Block only...
 #if SEQUENCE_LEVEL_LOSSLESS
@@ -288,7 +288,7 @@ Void TComRdCost::setDistParam( UInt uiBlkWidth, UInt uiBlkHeight, DFunc eDFunc, 
   // set Block Width / Height
   rcDistParam.iCols    = uiBlkWidth;
   rcDistParam.iRows    = uiBlkHeight;
-  rcDistParam.DistFunc = m_afpDistortFunc[eDFunc + g_aucConvertToBit[ rcDistParam.iCols ] + 1 ];
+  rcDistParam.DistFunc = m_afpDistortFunc[eDFunc + g_aucConvertToBit[ rcDistParam.iCols ] + 1 ];// 找到对应Distortion函数的索引
   
   // initialize
   rcDistParam.iSubShift  = 0;
@@ -455,7 +455,7 @@ UInt TComRdCost::getDistPart(Int bitDepth, Pel* piCur, Int iCurStride,  Pel* piO
 #endif
 {
   DistParam cDtParam;
-  setDistParam( uiBlkWidth, uiBlkHeight, eDFunc, cDtParam );
+  setDistParam( uiBlkWidth, uiBlkHeight, eDFunc, cDtParam ); //eDFunc = DF_SSE
   cDtParam.pOrg       = piOrg;
   cDtParam.pCur       = piCur;
   cDtParam.iStrideOrg = iOrgStride;
@@ -1210,7 +1210,7 @@ UInt TComRdCost::xGetSSE16N( DistParam* pcDtParam )
 
 UInt TComRdCost::xGetSSE32( DistParam* pcDtParam )
 {
-  if ( pcDtParam->bApplyWeight )
+  if ( pcDtParam->bApplyWeight ) //加权Distortion
   {
     assert( pcDtParam->iCols == 32 );
     return xGetSSEw( pcDtParam );

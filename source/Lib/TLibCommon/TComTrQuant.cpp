@@ -1128,7 +1128,7 @@ Void TComTrQuant::xQuant( TComDataCU* pcCU,
 }
 
 Void TComTrQuant::xDeQuant(Int bitDepth, const TCoeff* pSrc, Int* pDes, Int iWidth, Int iHeight, Int scalingListType )
-{
+{ //直接采用标准的公式进行的反量化
   
   const TCoeff* piQCoef   = pSrc;
   Int*   piCoef    = pDes;
@@ -1700,6 +1700,7 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
         {
           UInt   uiPosY        = uiBlkPos >> uiLog2BlkSize;
           UInt   uiPosX        = uiBlkPos - ( uiPosY << uiLog2BlkSize );
+          // 实际上得到SigCtxInc的过程就是判断，右，下面CoeffGroup的非0系数存在以及位置得到的索引，用于估计编码level所需位数进行RDOQ
           UShort uiCtxSig      = getSigCtxInc( patternSigCtx, uiScanIdx, uiPosX, uiPosY, uiLog2BlkSize, eTType );
           uiLevel              = xGetCodedLevel( pdCostCoeff[ iScanPos ], pdCostCoeff0[ iScanPos ], pdCostSig[ iScanPos ],
                                                 lLevelDouble, uiMaxAbsLevel, uiCtxSig, uiOneCtx, uiAbsCtx, uiGoRiceParam, 
@@ -1707,6 +1708,7 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
           sigRateDelta[ uiBlkPos ] = m_pcEstBitsSbac->significantBits[ uiCtxSig ][ 1 ] - m_pcEstBitsSbac->significantBits[ uiCtxSig ][ 0 ];
         }
         deltaU[ uiBlkPos ]        = (lLevelDouble - ((Int)uiLevel << iQBits)) >> (iQBits-8); // 误差>>(iQB-8)
+        // deltaU以及rateIncUp和Down都是为了SignHide做准备的 ,H0481,用于将其往上调至，往下调整
         if( uiLevel > 0 ) //填充RateIncUp以及RateIncDown两个表，计算量化不同带来的码率变化
         { //xGetICRate实际上就是获取估计编码bits的函数。分别计算往上量化，以及往下量化导致的bits变化
           Int rateNow = xGetICRate( uiLevel, uiOneCtx, uiAbsCtx, uiGoRiceParam, c1Idx, c2Idx );
@@ -1739,7 +1741,7 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
         {
           c1 = 0; 
           c2 += (c2 < 2);
-          c2Idx ++;
+          c2Idx ++; //c2Idx为 >=2 level的个数
         }
         else if( (c1 < 3) && (c1 > 0) && uiLevel) // c1 = 1,2时候且为非0系数则 c1 ++
         {
@@ -1783,21 +1785,21 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
       }
     } //end for (iScanPosinCG)
     
-    if (iCGLastScanPos >= 0) //已经找到最后一个非0位置了
+    if (iCGLastScanPos >= 0) //总是成立，针对一个组计算Cost
     {
-      if( iCGScanPos )
+      if( iCGScanPos ) //最后个非0系数CG组并不是第一个位置
       {
-        if (uiSigCoeffGroupFlag[ uiCGBlkPos ] == 0)
+        if (uiSigCoeffGroupFlag[ uiCGBlkPos ] == 0) //最后一个非0系数的CG组之前的全0系数的CG
         {
           UInt  uiCtxSig = getSigCoeffGroupCtxInc( uiSigCoeffGroupFlag, uiCGPosX, uiCGPosY, uiWidth, uiHeight);
           d64BaseCost += xGetRateSigCoeffGroup(0, uiCtxSig) - rdStats.d64SigCost;;  
           pdCostCoeffGroupSig[ iCGScanPos ] = xGetRateSigCoeffGroup(0, uiCtxSig);  
         } 
-        else
-        {
+        else // 此CG有非0系数
+        { //尝试不量化，全部设为0之时的误差与当前误差对比，如果误差小，则将其设为全0的CG
           if (iCGScanPos < iCGLastScanPos) //skip the last coefficient group, which will be handled together with last position below.
           {
-            if ( rdStats.iNNZbeforePos0 == 0 ) 
+            if ( rdStats.iNNZbeforePos0 == 0 ) // 无Pos 0 之后无非0系数则减去pos 0 的Cost
             {
               d64BaseCost -= rdStats.d64SigCost_0;
               rdStats.d64SigCost -= rdStats.d64SigCost_0;
@@ -1834,7 +1836,7 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
                 iScanPos      = iCGScanPos*uiCGSize + iScanPosinCG;
                 UInt uiBlkPos = scan[ iScanPos ];
                 
-                if (piDstCoeff[ uiBlkPos ])
+                if (piDstCoeff[ uiBlkPos ]) // 量化level非0
                 {
                   piDstCoeff [ uiBlkPos ] = 0;
                   pdCostCoeff[ iScanPos ] = pdCostCoeff0[ iScanPos ];
@@ -1844,8 +1846,8 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
             } // end if ( d64CostAllZeros < d64BaseCost )      
           }
         } // end if if (uiSigCoeffGroupFlag[ uiCGBlkPos ] == 0)
-      }
-      else
+      } 
+      else // 第一个CG组设为非0 CG组
       {
         uiSigCoeffGroupFlag[ uiCGBlkPos ] = 1;
       }
@@ -1853,12 +1855,12 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
   } //end for (iCGScanPos)
   
   //===== estimate last position =====
-  if ( iLastScanPos < 0 )
+  if ( iLastScanPos < 0 ) //不存在非0系数
   {
     return;
   }
   
-  Double  d64BestCost         = 0;
+  Double  d64BestCost         = 0; //初始值为全部编码为0时候的误差，即未编码的的最大误差
   Int     ui16CtxCbf          = 0;
   Int     iBestLastIdxP1      = 0;
   if( !pcCU->isIntra( uiAbsPartIdx ) && eTType == TEXT_LUMA && pcCU->getTransformIdx( uiAbsPartIdx ) == 0 )
@@ -1876,33 +1878,33 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
   }
   
   Bool bFoundLast = false;
-  for (Int iCGScanPos = iCGLastScanPos; iCGScanPos >= 0; iCGScanPos--)
+  for (Int iCGScanPos = iCGLastScanPos; iCGScanPos >= 0; iCGScanPos--) //从最后个非0CG逆序扫描
   {
-    UInt uiCGBlkPos = scanCG[ iCGScanPos ];
+    UInt uiCGBlkPos = scanCG[ iCGScanPos ]; //cg zigzag index
     
     d64BaseCost -= pdCostCoeffGroupSig [ iCGScanPos ]; 
-    if (uiSigCoeffGroupFlag[ uiCGBlkPos ])
+    if (uiSigCoeffGroupFlag[ uiCGBlkPos ]) //有非0
     {     
-      for (Int iScanPosinCG = uiCGSize-1; iScanPosinCG >= 0; iScanPosinCG--)
+      for (Int iScanPosinCG = uiCGSize-1; iScanPosinCG >= 0; iScanPosinCG--) // 逆序扫描CG内部
       {
-        iScanPos = iCGScanPos*uiCGSize + iScanPosinCG;
-        if (iScanPos > iLastScanPos) continue;
-        UInt   uiBlkPos     = scan[iScanPos];
+        iScanPos = iCGScanPos*uiCGSize + iScanPosinCG; //Raster Index
+        if (iScanPos > iLastScanPos) continue; //直到找到最后一个位置
+        UInt   uiBlkPos     = scan[iScanPos]; //cg 内部像素Zigzag index
         
         if( piDstCoeff[ uiBlkPos ] )
         {
           UInt   uiPosY       = uiBlkPos >> uiLog2BlkSize;
           UInt   uiPosX       = uiBlkPos - ( uiPosY << uiLog2BlkSize );
-          
+          // 根据Ver,Hor计算最后一个的Cost
           Double d64CostLast= uiScanIdx == SCAN_VER ? xGetRateLast( uiPosY, uiPosX ) : xGetRateLast( uiPosX, uiPosY );
           Double totalCost = d64BaseCost + d64CostLast - pdCostSig[ iScanPos ];
           
-          if( totalCost < d64BestCost )
+          if( totalCost < d64BestCost ) //// 这里就是找到一个忽略位置i,要求i之前像素编码后Cost小于当前最小值
           {
-            iBestLastIdxP1  = iScanPos + 1;
+            iBestLastIdxP1  = iScanPos + 1; //这个索引标记最后一个 Cost<bEST的地方
             d64BestCost     = totalCost;
           }
-          if( piDstCoeff[ uiBlkPos ] > 1 )
+          if( piDstCoeff[ uiBlkPos ] > 1 ) //逆序扫描像素，找到最后一个level>1的像素点
           {
             bFoundLast = true;
             break;
@@ -1922,22 +1924,22 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
     } // end if (uiSigCoeffGroupFlag[ uiCGBlkPos ])
   } // end for 
   
-  for ( Int scanPos = 0; scanPos < iBestLastIdxP1; scanPos++ )
-  {
+  for ( Int scanPos = 0; scanPos < iBestLastIdxP1; scanPos++ ) //只关注最佳位置之前的
+  {//只关注iBest之前的
     Int blkPos = scan[ scanPos ];
     Int level  = piDstCoeff[ blkPos ];
     uiAbsSum += level;
-    piDstCoeff[ blkPos ] = ( plSrcCoeff[ blkPos ] < 0 ) ? -level : level;
+    piDstCoeff[ blkPos ] = ( plSrcCoeff[ blkPos ] < 0 ) ? -level : level; //加入正负号
   }
   
   //===== clean uncoded coefficients =====
-  for ( Int scanPos = iBestLastIdxP1; scanPos <= iLastScanPos; scanPos++ )
+  for ( Int scanPos = iBestLastIdxP1; scanPos <= iLastScanPos; scanPos++ ) //之后的直接处理掉
   {
     piDstCoeff[ scan[ scanPos ] ] = 0;
   }
   
-  if( pcCU->getSlice()->getPPS()->getSignHideFlag() && uiAbsSum>=2)
-  {
+  if( pcCU->getSlice()->getPPS()->getSignHideFlag() && uiAbsSum>=2) // 特殊情况，暂不考虑
+  { // H0481 当每个CG内部的lastNoZeroIndex - FirstNZIndex > 阙值时就隐藏首个非0值得符号位，但令其可以从所有非0系数之和中推断出来
     Int64 rdFactor = (Int64) (
                      g_invQuantScales[m_cQP.rem()] * g_invQuantScales[m_cQP.rem()] * (1<<(2*m_cQP.m_iPer))
                    / m_dLambda / 16 / (1<<DISTORTION_PRECISION_ADJUSTMENT(2*(uiBitDepth-8)))
@@ -1947,12 +1949,12 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
     Int n ;
     
     for( Int subSet = (uiWidth*uiHeight-1) >> LOG2_SCAN_SET_SIZE; subSet >= 0; subSet-- )
-    {
-      Int  subPos     = subSet << LOG2_SCAN_SET_SIZE;
+    {// subSet是CG的序号，倒序
+      Int  subPos     = subSet << LOG2_SCAN_SET_SIZE; //subPos则是像素index
       Int  firstNZPosInCG=SCAN_SET_SIZE , lastNZPosInCG=-1 ;
       absSum = 0 ;
       
-      for(n = SCAN_SET_SIZE-1; n >= 0; --n )
+      for(n = SCAN_SET_SIZE-1; n >= 0; --n ) // CG组内，找最后一个非0
       {
         if( piDstCoeff[ scan[ n + subPos ]] )
         {
@@ -1961,7 +1963,7 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
         }
       }
       
-      for(n = 0; n <SCAN_SET_SIZE; n++ )
+      for(n = 0; n <SCAN_SET_SIZE; n++ )// CG组内，找第一个非0
       {
         if( piDstCoeff[ scan[ n + subPos ]] )
         {
@@ -1970,27 +1972,27 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
         }
       }
       
-      for(n = firstNZPosInCG; n <=lastNZPosInCG; n++ )
+      for(n = firstNZPosInCG; n <=lastNZPosInCG; n++ ) //统计直接的absSum
       {
         absSum += piDstCoeff[ scan[ n + subPos ]];
       }
       
-      if(lastNZPosInCG>=0 && lastCG==-1)
+      if(lastNZPosInCG>=0 && lastCG==-1) //找到最后个CG了
       {
         lastCG = 1; 
       } 
       
-      if( lastNZPosInCG-firstNZPosInCG>=SBH_THRESHOLD )
-      {
-        UInt signbit = (piDstCoeff[scan[subPos+firstNZPosInCG]]>0?0:1);
-        if( signbit!=(absSum&0x1) )  // hide but need tune
+      if( lastNZPosInCG-firstNZPosInCG>=SBH_THRESHOLD ) //范围大于一定值是
+      {// H0481中所说的,奇数即负数，偶数即整数，第0为与符号位相同
+        UInt signbit = (piDstCoeff[scan[subPos+firstNZPosInCG]]>0?0:1); //符号位
+        if( signbit!=(absSum&0x1) )  // hide but need tune，0位于符号位不同，要调整
         {
           // calculate the cost 
           Int64 minCostInc = MAX_INT64, curCost=MAX_INT64;
           Int minPos =-1, finalChange=0, curChange=0;
           
-          for( n = (lastCG==1?lastNZPosInCG:SCAN_SET_SIZE-1) ; n >= 0; --n )
-          {
+          for( n = (lastCG==1?lastNZPosInCG:SCAN_SET_SIZE-1) ; n >= 0; --n )//从最后个或者最后个非0逆序
+          { //找到调整损耗最小的的Coeff位置
             UInt uiBlkPos   = scan[ n + subPos ];
             if(piDstCoeff[ uiBlkPos ] != 0 )
             {
@@ -2049,7 +2051,7 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
             finalChange = -1;
           }
           
-          if(plSrcCoeff[minPos]>=0)
+          if(plSrcCoeff[minPos]>=0) //调整偶变奇，奇数变偶数 大于加，小于减
           {
             piDstCoeff[minPos] += finalChange ;
           }
@@ -2114,7 +2116,7 @@ Int TComTrQuant::getSigCtxInc    (
                                    Int                             log2BlockSize,
                                    TextType                        textureType
                                   )
-{
+{//draft 9.3.4.2.5
   const Int ctxIndMap[16] =
   {
     0, 1, 4, 5,
@@ -2132,26 +2134,26 @@ Int TComTrQuant::getSigCtxInc    (
   {
     return ctxIndMap[ 4 * posY + posX ];
   }
-
+  //scanIdx为0,1,2即zigzag,水平，垂直
   Int offset = log2BlockSize == 3 ? (scanIdx==SCAN_DIAG ? 9 : 15) : (textureType == TEXT_LUMA ? 21 : 12);
-
-  Int posXinSubset = posX-((posX>>2)<<2);
-  Int posYinSubset = posY-((posY>>2)<<2);
+  // posX为
+  Int posXinSubset = posX-((posX>>2)<<2); // = posX & 3 = posX % 4
+  Int posYinSubset = posY-((posY>>2)<<2);// = posY & 3 = posY % 4
   Int cnt = 0;
-  if(patternSigCtx==0)
-  {
+  if(patternSigCtx==0) // 右下边的元素都为0
+  { //4x4x（TU）内，0,0处的为2+x，前两列非00则1+x,后两列0+x
     cnt = posXinSubset+posYinSubset<=2 ? (posXinSubset+posYinSubset==0 ? 2 : 1) : 0;
   }
-  else if(patternSigCtx==1)
-  {
+  else if(patternSigCtx==1)//右边存在
+  {// 2 1 0
     cnt = posYinSubset<=1 ? (posYinSubset==0 ? 2 : 1) : 0;
   }
-  else if(patternSigCtx==2)
-  {
+  else if(patternSigCtx==2)//下边存在
+  {// 2 1 0
     cnt = posXinSubset<=1 ? (posXinSubset==0 ? 2 : 1) : 0;
   }
-  else
-  {
+  else // 右下均存在
+  { // 2
     cnt = 2;
   }
 
