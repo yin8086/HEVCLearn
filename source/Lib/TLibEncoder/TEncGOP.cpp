@@ -946,7 +946,7 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
 
       Bool bNoBinBitConstraintViolated = (!pcSlice->isNextSlice() && !pcSlice->isNextSliceSegment());
       if (pcSlice->isNextSlice() || (bNoBinBitConstraintViolated && m_pcCfg->getSliceMode()==FIXED_NUMBER_OF_LCU))
-      {
+      {// 有下一个Slice或者，说只有一个SLice，但Slice里面有固定个数LCU
         startCUAddrSlice = pcSlice->getSliceCurEndCUAddr();
         // Reconstruction slice
         m_storedStartCUAddrForEncodingSlice.push_back(startCUAddrSlice);
@@ -973,26 +973,26 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
         }
       }
       else if (pcSlice->isNextSliceSegment() || (bNoBinBitConstraintViolated && m_pcCfg->getSliceSegmentMode()==FIXED_NUMBER_OF_LCU))
-      {
+      {// 类似
         startCUAddrSliceSegment                                                     = pcSlice->getSliceSegmentCurEndCUAddr();
         m_storedStartCUAddrForEncodingSliceSegment.push_back(startCUAddrSliceSegment);
         startCUAddrSliceSegmentIdx++;
         pcSlice->setSliceSegmentCurStartCUAddr( startCUAddrSliceSegment );
       }
       else
-      {
+      { //正常一个Pic一个Slice且包含所有的LCU,则CUAddrSlice直接指向尾部，表示完成
         startCUAddrSlice                                                            = pcSlice->getSliceCurEndCUAddr();
         startCUAddrSliceSegment                                                     = pcSlice->getSliceSegmentCurEndCUAddr();
       }        
-
+      // max
       nextCUAddr = (startCUAddrSlice > startCUAddrSliceSegment) ? startCUAddrSlice : startCUAddrSliceSegment;
-    }
+    } //完成当前Slice, 开始下块Slice
     m_storedStartCUAddrForEncodingSlice.push_back( pcSlice->getSliceCurEndCUAddr());
     startCUAddrSliceIdx++;
     m_storedStartCUAddrForEncodingSliceSegment.push_back(pcSlice->getSliceCurEndCUAddr());
     startCUAddrSliceSegmentIdx++;
 
-    pcSlice = pcPic->getSlice(0);
+    pcSlice = pcPic->getSlice(0); //取出第一个Slice，第一个是为何？
 
     // SAO parameter estimation using non-deblocked pixels for LCU bottom and right boundary areas
     if( m_pcCfg->getSaoLcuBasedOptimization() && m_pcCfg->getSaoLcuBoundary() )
@@ -1003,11 +1003,11 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
 
     //-- Loop filter
     Bool bLFCrossTileBoundary = pcSlice->getPPS()->getLoopFilterAcrossTilesEnabledFlag();
-    m_pcLoopFilter->setCfg(bLFCrossTileBoundary);
+    m_pcLoopFilter->setCfg(bLFCrossTileBoundary); //设置Deblock跨越Slice
 #if L0386_DB_METRIC
     if ( m_pcCfg->getDeblockingFilterMetric() )
     {
-      dblMetric(pcPic, uiNumSlices);
+      dblMetric(pcPic, uiNumSlices); //去方块滤波的自动Metric算法，默认关闭
     }
 #endif
     m_pcLoopFilter->loopFilterPic( pcPic );
@@ -1016,11 +1016,11 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
     if(pcSlice->getSPS()->getUseSAO())
     {
       std::vector<Bool> LFCrossSliceBoundaryFlag;
-      for(Int s=0; s< uiNumSlices; s++)
+      for(Int s=0; s< uiNumSlices; s++) //设置是否跨越SLice进行
       {
         LFCrossSliceBoundaryFlag.push_back(  ((uiNumSlices==1)?true:pcPic->getSlice(s)->getLFCrossSliceBoundaryFlag()) );
       }
-      m_storedStartCUAddrForEncodingSlice.resize(uiNumSlices+1);
+      m_storedStartCUAddrForEncodingSlice.resize(uiNumSlices+1); // 弄出来个临时空间用于计算？
       pcPic->createNonDBFilterInfo(m_storedStartCUAddrForEncodingSlice, 0, &LFCrossSliceBoundaryFlag ,pcPic->getPicSym()->getNumTiles() ,bLFCrossTileBoundary);
     }
 
@@ -1296,7 +1296,7 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
       writeRBSPTrailingBits(nalu.m_Bitstream);
       accessUnit.push_back(new NALUnitEBSP(nalu));
     }
-
+    // 上面是一堆编码写入NAL信息的函数，先不管，看SAO
     /* use the main bitstream buffer for storing the marshalled picture */
     m_pcEntropyCoder->setBitstream(NULL);
 
@@ -1583,7 +1583,7 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
             {
               m_pcEntropyCoder->resetEntropy();
               m_pcEntropyCoder->setBitstream( m_pcBitCounter );
-              m_pcSAO->startSaoEnc(pcPic, m_pcEntropyCoder, m_pcEncTop->getRDSbacCoder(), m_pcEncTop->getRDGoOnSbacCoder());
+              m_pcSAO->startSaoEnc(pcPic, m_pcEntropyCoder, m_pcEncTop->getRDSbacCoder(), m_pcEncTop->getRDGoOnSbacCoder()); //初始化
               SAOParam& cSaoParam = *pcSlice->getPic()->getPicSym()->getSaoParam();
 
 #if SAO_CHROMA_LAMBDA

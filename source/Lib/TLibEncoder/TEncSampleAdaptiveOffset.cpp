@@ -691,7 +691,7 @@ Void TEncSampleAdaptiveOffset::endSaoEnc()
 }
 
 inline Int xSign(Int x)
-{
+{ // xSign(正) = 1 xSign(负) = -1, xSign(0) = 0
   return ((x >> 31) | ((Int)( (((UInt) -x)) >> 31)));
 }
 
@@ -954,7 +954,7 @@ Void TEncSampleAdaptiveOffset::calcSaoStatsBlock( Pel* pRecStart, Pel* pOrgStart
 Void TEncSampleAdaptiveOffset::calcSaoStatsCu(Int iAddr, Int iPartIdx, Int iYCbCr)
 {
   if(!m_bUseNIF)
-  {
+  { // 核心就是计算Stats值以及Count，（即在各种模式下，Band不同Class(高5位)，EO四种方向时的残差和
     calcSaoStatsCuOrg( iAddr, iPartIdx, iYCbCr);
   }
   else
@@ -997,7 +997,7 @@ Void TEncSampleAdaptiveOffset::calcSaoStatsCu(Int iAddr, Int iPartIdx, Int iYCbC
 Void TEncSampleAdaptiveOffset::calcSaoStatsCuOrg(Int iAddr, Int iPartIdx, Int iYCbCr)
 {
   Int x,y;
-  TComDataCU *pTmpCu = m_pcPic->getCU(iAddr);
+  TComDataCU *pTmpCu = m_pcPic->getCU(iAddr); //当前LCU
   TComSPS *pTmpSPS =  m_pcPic->getSlice(0)->getSPS();
 
   Pel* pOrg;
@@ -1018,7 +1018,7 @@ Void TEncSampleAdaptiveOffset::calcSaoStatsCuOrg(Int iAddr, Int iPartIdx, Int iY
   Int iStartY;
   Int iEndX;
   Int iEndY;
-  Pel* pTableBo = (iYCbCr==0)?m_lumaTableBo:m_chromaTableBo;
+  Pel* pTableBo = (iYCbCr==0)?m_lumaTableBo:m_chromaTableBo; //正确的偏移Table,每个像素值对应的Band内偏移
 
   Int iIsChroma = (iYCbCr!=0)? 1:0;
   Int numSkipLine = iIsChroma? 2:4;
@@ -1032,7 +1032,7 @@ Void TEncSampleAdaptiveOffset::calcSaoStatsCuOrg(Int iAddr, Int iPartIdx, Int iY
   {
     numSkipLineRight = 0;
   }
-
+  // 根据Luma 或者 CHroma调整数值
   iPicWidthTmp  = m_iPicWidth  >> iIsChroma;
   iPicHeightTmp = m_iPicHeight >> iIsChroma;
   iLcuWidth     = iLcuWidth    >> iIsChroma;
@@ -1041,9 +1041,9 @@ Void TEncSampleAdaptiveOffset::calcSaoStatsCuOrg(Int iAddr, Int iPartIdx, Int iY
   uiTPelY       = uiTPelY      >> iIsChroma;
   uiRPelX       = uiLPelX + iLcuWidth  ;
   uiBPelY       = uiTPelY + iLcuHeight ;
-  uiRPelX       = uiRPelX > iPicWidthTmp  ? iPicWidthTmp  : uiRPelX;
+  uiRPelX       = uiRPelX > iPicWidthTmp  ? iPicWidthTmp  : uiRPelX; //局限在原宽内
   uiBPelY       = uiBPelY > iPicHeightTmp ? iPicHeightTmp : uiBPelY;
-  iLcuWidth     = uiRPelX - uiLPelX;
+  iLcuWidth     = uiRPelX - uiLPelX; //实际的LCU宽高，不包括补齐，不一定为64最大值
   iLcuHeight    = uiBPelY - uiTPelY;
 
   iStride    =  (iYCbCr == 0)? m_pcPic->getStride(): m_pcPic->getCStride();
@@ -1055,23 +1055,23 @@ Void TEncSampleAdaptiveOffset::calcSaoStatsCuOrg(Int iAddr, Int iPartIdx, Int iY
       numSkipLine = iIsChroma? 1:3;
       numSkipLineRight = iIsChroma? 2:4;
     }
-    iStats = m_iOffsetOrg[iPartIdx][SAO_BO];
+    iStats = m_iOffsetOrg[iPartIdx][SAO_BO]; //索引为，LCU内 PartIdx,  SAO类型， Class
     iCount = m_iCount    [iPartIdx][SAO_BO];
 
     pOrg = getPicYuvAddr(m_pcPic->getPicYuvOrg(), iYCbCr, iAddr);
     pRec = getPicYuvAddr(m_pcPic->getPicYuvRec(), iYCbCr, iAddr);
-
-    iEndX   = (uiRPelX == iPicWidthTmp) ? iLcuWidth : iLcuWidth-numSkipLineRight;
+    // 不到边缘则需要进行相应的省略
+    iEndX   = (uiRPelX == iPicWidthTmp) ? iLcuWidth : iLcuWidth-numSkipLineRight; 
     iEndY   = (uiBPelY == iPicHeightTmp) ? iLcuHeight : iLcuHeight-numSkipLine;
-    for (y=0; y<iEndY; y++)
+    for (y=0; y<iEndY; y++) //处理LCU中每一个像素
     {
       for (x=0; x<iEndX; x++)
       {
-        iClassIdx = pTableBo[pRec[x]];
-        if (iClassIdx)
+        iClassIdx = pTableBo[pRec[x]]; //取出其Band内偏移序号，这个就是Class,一个Class对应8中块
+        if (iClassIdx) //由于+1我觉得一般成立
         {
-          iStats[iClassIdx] += (pOrg[x] - pRec[x]); 
-          iCount[iClassIdx] ++;
+          iStats[iClassIdx] += (pOrg[x] - pRec[x]); // 在同一个Class内，残差之和
+          iCount[iClassIdx] ++; //统计出现次数
         }
       }
       pOrg += iStride;
@@ -1088,7 +1088,7 @@ Void TEncSampleAdaptiveOffset::calcSaoStatsCuOrg(Int iAddr, Int iPartIdx, Int iY
   UInt uiEdgeType;
 
 //if (iSaoType == EO_0  || iSaoType == EO_1 || iSaoType == EO_2 || iSaoType == EO_3)
-  {
+  { //实际上就是进行Edge Offset的初始状态的填充， EO_0就是水平Edge
   //if (iSaoType == EO_0)
     {
       if( m_saoLcuBasedOptimization && m_saoLcuBoundary )
@@ -1102,18 +1102,18 @@ Void TEncSampleAdaptiveOffset::calcSaoStatsCuOrg(Int iAddr, Int iPartIdx, Int iY
       pOrg = getPicYuvAddr(m_pcPic->getPicYuvOrg(), iYCbCr, iAddr);
       pRec = getPicYuvAddr(m_pcPic->getPicYuvRec(), iYCbCr, iAddr);
 
-      iStartX = (uiLPelX == 0) ? 1 : 0;
+      iStartX = (uiLPelX == 0) ? 1 : 0; // 0就去掉一些边缘？
       iEndX   = (uiRPelX == iPicWidthTmp) ? iLcuWidth-1 : iLcuWidth-numSkipLineRight;
       for (y=0; y<iLcuHeight-numSkipLine; y++)
       {
-        iSignLeft = xSign(pRec[iStartX] - pRec[iStartX-1]);
+        iSignLeft = xSign(pRec[iStartX] - pRec[iStartX-1]); // 得出其正负,正为1，负为-1
         for (x=iStartX; x< iEndX; x++)
         {
-          iSignRight =  xSign(pRec[x] - pRec[x+1]); 
+          iSignRight =  xSign(pRec[x] - pRec[x+1]);  //与右侧相比大小
           uiEdgeType =  iSignRight + iSignLeft + 2;
-          iSignLeft  = -iSignRight;
+          iSignLeft  = -iSignRight; //前进一个，这个自然就变成Left了
 
-          iStats[m_auiEoTable[uiEdgeType]] += (pOrg[x] - pRec[x]);
+          iStats[m_auiEoTable[uiEdgeType]] += (pOrg[x] - pRec[x]); //找到对应的EdgeIdx，添加进状态
           iCount[m_auiEoTable[uiEdgeType]] ++;
         }
         pOrg += iStride;
@@ -1137,7 +1137,7 @@ Void TEncSampleAdaptiveOffset::calcSaoStatsCuOrg(Int iAddr, Int iPartIdx, Int iY
       iStartY = (uiTPelY == 0) ? 1 : 0;
       iEndX   = (uiRPelX == iPicWidthTmp) ? iLcuWidth : iLcuWidth-numSkipLineRight;
       iEndY   = (uiBPelY == iPicHeightTmp) ? iLcuHeight-1 : iLcuHeight-numSkipLine;
-      if (uiTPelY == 0)
+      if (uiTPelY == 0) //跳过第一行
       {
         pOrg += iStride;
         pRec += iStride;
@@ -1145,9 +1145,9 @@ Void TEncSampleAdaptiveOffset::calcSaoStatsCuOrg(Int iAddr, Int iPartIdx, Int iY
 
       for (x=0; x< iLcuWidth; x++)
       {
-        m_iUpBuff1[x] = xSign(pRec[x] - pRec[x-iStride]);
+        m_iUpBuff1[x] = xSign(pRec[x] - pRec[x-iStride]); //本行减去上一行元素（第二行）
       }
-      for (y=iStartY; y<iEndY; y++)
+      for (y=iStartY; y<iEndY; y++)//二行开始
       {
         for (x=0; x<iEndX; x++)
         {
@@ -1676,7 +1676,7 @@ Void TEncSampleAdaptiveOffset::SAOProcess(SAOParam *pcSaoParam, Double dLambdaLu
 Void TEncSampleAdaptiveOffset::SAOProcess(SAOParam *pcSaoParam, Double dLambda)
 #endif
 {
-  if(m_bUseNIF)
+  if(m_bUseNIF) //进行ALF，最新标准已经完全为false了
   {
     m_pcPic->getPicYuvRec()->copyToPic(m_pcYuvTmp);
   }
@@ -1897,22 +1897,22 @@ Void TEncSampleAdaptiveOffset::rdoSaoUnitAll(SAOParam *saoParam, Double lambda, 
 #endif
 #endif
 
-  for (idxY = 0; idxY< frameHeightInCU; idxY++)
+  for (idxY = 0; idxY< frameHeightInCU; idxY++) // 一个个LCU循环
   {
     for (idxX = 0; idxX< frameWidthInCU; idxX++)
     {
-      addr     = idxX  + frameWidthInCU*idxY;
-      addrUp   = addr < frameWidthInCU ? -1:idxX   + frameWidthInCU*(idxY-1);
-      addrLeft = idxX == 0               ? -1:idxX-1 + frameWidthInCU*idxY;
+      addr     = idxX  + frameWidthInCU*idxY; //LCU一维偏移
+      addrUp   = addr < frameWidthInCU ? -1:idxX   + frameWidthInCU*(idxY-1); //上边LCU的一维偏移
+      addrLeft = idxX == 0               ? -1:idxX-1 + frameWidthInCU*idxY; // 左侧LCU的一维偏移
       Int allowMergeLeft = 1;
       Int allowMergeUp   = 1;
       UInt rate;
       Double bestCost, mergeCost;
-      if (idxX!=0)
+      if (idxX!=0) //根据x,y设置是否允许MergeLeft或者Up
       { 
         // check tile id and slice id 
         if ( (m_pcPic->getPicSym()->getTileIdxMap(addr-1) != m_pcPic->getPicSym()->getTileIdxMap(addr)) || (m_pcPic->getCU(addr-1)->getSlice()->getSliceIdx() != m_pcPic->getCU(addr)->getSlice()->getSliceIdx()))
-        {
+        {//跨越Tile或者Slice
           allowMergeLeft = 0;
         }
       }
@@ -1936,7 +1936,7 @@ Void TEncSampleAdaptiveOffset::rdoSaoUnitAll(SAOParam *saoParam, Double lambda, 
       compDistortion[1] = 0; 
       compDistortion[2] = 0;
       m_pcRDGoOnSbacCoder->load(m_pppcRDSbacCoder[0][CI_CURR_BEST]);
-      if (allowMergeLeft)
+      if (allowMergeLeft) // 编码句法元素
       {
         m_pcEntropyCoder->m_pcEntropyCoderIf->codeSaoMerge(0); 
       }
@@ -1946,9 +1946,9 @@ Void TEncSampleAdaptiveOffset::rdoSaoUnitAll(SAOParam *saoParam, Double lambda, 
       }
       m_pcRDGoOnSbacCoder->store( m_pppcRDSbacCoder[0][CI_TEMP_BEST] );
       // reset stats Y, Cb, Cr
-      for ( compIdx=0;compIdx<3;compIdx++)
+      for ( compIdx=0;compIdx<3;compIdx++) //这个三个序号对应Y, Cb, Cr
       {
-        for ( j=0;j<MAX_NUM_SAO_TYPE;j++)
+        for ( j=0;j<MAX_NUM_SAO_TYPE;j++) //4种Edge，一种Band
         {
           for ( k=0;k< MAX_NUM_SAO_CLASS;k++)
           {
@@ -1972,7 +1972,7 @@ Void TEncSampleAdaptiveOffset::rdoSaoUnitAll(SAOParam *saoParam, Double lambda, 
   if( (compIdx ==0 && saoParam->bSaoFlag[0])|| (compIdx >0 && saoParam->bSaoFlag[1]) )
 #endif
         {
-          calcSaoStatsCu(addr, compIdx,  compIdx);
+          calcSaoStatsCu(addr, compIdx,  compIdx); //对此LCU，分别针对Y,Cb,Cr进行Stats的初始化
 
        }
       }
@@ -2107,19 +2107,19 @@ inline Int64 TEncSampleAdaptiveOffset::estSaoTypeDist(Int compIdx, Int typeIdx, 
   Int saoOffsetTh = (compIdx==0) ? m_iOffsetThY : m_iOffsetThC;
 
   for(classIdx=1; classIdx < ( (typeIdx < SAO_BO) ?  m_iNumClass[typeIdx]+1 : SAO_MAX_BO_CLASSES+1); classIdx++)
-  {
+  { //循环,BO的话32种Class（高5位），EO的话4个方向
     if( typeIdx == SAO_BO)
     {
       currentDistortionTableBo[classIdx-1] = 0;
       currentRdCostTableBo[classIdx-1] = lambda;
     }
-    if(m_iCount [compIdx][typeIdx][classIdx])
-    {
+    if(m_iCount [compIdx][typeIdx][classIdx]) //有符合Class的像素点
+    { //处理残差和
       m_iOffset[compIdx][typeIdx][classIdx] = (Int64) xRoundIbdi(bitDepth, (Double)(m_iOffsetOrg[compIdx][typeIdx][classIdx]<<(bitDepth-8)) / (Double)(m_iCount [compIdx][typeIdx][classIdx]<<saoBitIncrease));
       m_iOffset[compIdx][typeIdx][classIdx] = Clip3(-saoOffsetTh+1, saoOffsetTh-1, (Int)m_iOffset[compIdx][typeIdx][classIdx]);
-      if (typeIdx < 4)
+      if (typeIdx < 4) // = EO
       {
-        if ( m_iOffset[compIdx][typeIdx][classIdx]<0 && classIdx<3 )
+        if ( m_iOffset[compIdx][typeIdx][classIdx]<0 && classIdx<3 ) //EO且 <0且3之内
         {
           m_iOffset[compIdx][typeIdx][classIdx] = 0;
         }
@@ -2128,15 +2128,15 @@ inline Int64 TEncSampleAdaptiveOffset::estSaoTypeDist(Int compIdx, Int typeIdx, 
           m_iOffset[compIdx][typeIdx][classIdx] = 0;
         }
       }
-      m_iOffset[compIdx][typeIdx][classIdx] = estIterOffset( typeIdx, classIdx, lambda, m_iOffset[compIdx][typeIdx][classIdx], m_iCount [compIdx][typeIdx][classIdx], m_iOffsetOrg[compIdx][typeIdx][classIdx], shift, saoBitIncrease, currentDistortionTableBo, currentRdCostTableBo, saoOffsetTh );
+      m_iOffset[compIdx][typeIdx][classIdx] = estIterOffset( typeIdx, classIdx, lambda, m_iOffset[compIdx][typeIdx][classIdx], m_iCount [compIdx][typeIdx][classIdx], m_iOffsetOrg[compIdx][typeIdx][classIdx], shift, saoBitIncrease, currentDistortionTableBo, currentRdCostTableBo, saoOffsetTh ); //计算Dist求出最优Offset
     }
     else
     {
       m_iOffsetOrg[compIdx][typeIdx][classIdx] = 0;
       m_iOffset[compIdx][typeIdx][classIdx] = 0;
     }
-    if( typeIdx != SAO_BO )
-    {
+    if( typeIdx != SAO_BO ) // = EO
+    { //累计Dist
       estDist   += estSaoDist( m_iCount [compIdx][typeIdx][classIdx], m_iOffset[compIdx][typeIdx][classIdx] << saoBitIncrease, m_iOffsetOrg[compIdx][typeIdx][classIdx], shift);
     }
 
@@ -2145,7 +2145,7 @@ inline Int64 TEncSampleAdaptiveOffset::estSaoTypeDist(Int compIdx, Int typeIdx, 
 }
 
 inline Int64 TEncSampleAdaptiveOffset::estSaoDist(Int64 count, Int64 offset, Int64 offsetOrg, Int shift)
-{
+{ //类似SAD求误差感觉
   return (( count*offset*offset-offsetOrg*offset*2 ) >> shift);
 }
 inline Int64 TEncSampleAdaptiveOffset::estIterOffset(Int typeIdx, Int classIdx, Double lambda, Int64 offsetInput, Int64 count, Int64 offsetOrg, Int shift, Int bitIncrease, Int *currentDistortionTableBo, Double *currentRdCostTableBo, Int offsetTh )
@@ -2155,7 +2155,7 @@ inline Int64 TEncSampleAdaptiveOffset::estIterOffset(Int typeIdx, Int classIdx, 
   Int64 tempDist, tempRate;
   Double tempCost, tempMinCost;
   Int64 offsetOutput = 0;
-  iterOffset = offsetInput;
+  iterOffset = offsetInput; //初始处理后的残差值之和得到的Offset
   // Assuming sending quantized value 0 results in zero offset and sending the value zero needs 1 bit. entropy coder can be used to measure the exact rate here. 
   tempMinCost = lambda; 
   while (iterOffset != 0)
@@ -2169,7 +2169,7 @@ inline Int64 TEncSampleAdaptiveOffset::estIterOffset(Int typeIdx, Int classIdx, 
     // Do the dequntization before distorion calculation
     tempOffset  = iterOffset << bitIncrease;
     tempDist    = estSaoDist( count, tempOffset, offsetOrg, shift);
-    tempCost    = ((Double)tempDist + lambda * (Double) tempRate);
+    tempCost    = ((Double)tempDist + lambda * (Double) tempRate); // = Dist + lambda * bits
     if(tempCost < tempMinCost)
     {
       tempMinCost = tempCost;
@@ -2220,17 +2220,17 @@ Void TEncSampleAdaptiveOffset::saoComponentParamDist(Int allowMergeLeft, Int all
   m_pcRDGoOnSbacCoder->resetBits();
  m_pcEntropyCoder->encodeSaoOffset(&saoLcuParamRdo, yCbCr);
   
-  dCostPartBest = m_pcEntropyCoder->getNumberOfWrittenBits()*lambda ; 
+  dCostPartBest = m_pcEntropyCoder->getNumberOfWrittenBits()*lambda ; // lambda*bits
   copySaoUnit(saoLcuParam, &saoLcuParamRdo );
   bestDist = 0;
   
 
 
-  for (typeIdx=0; typeIdx<MAX_NUM_SAO_TYPE; typeIdx++)
-  {
+  for (typeIdx=0; typeIdx<MAX_NUM_SAO_TYPE; typeIdx++)//4个方向EO，一个BO
+  { //计算出各个Type的Distortion
     estDist = estSaoTypeDist(yCbCr, typeIdx, shift, lambda, currentDistortionTableBo, currentRdCostTableBo);
 
-    if( typeIdx == SAO_BO )
+    if( typeIdx == SAO_BO ) //Band
     {
       // Estimate Best Position
       Double currentRDCost = 0.0;
@@ -2273,9 +2273,9 @@ Void TEncSampleAdaptiveOffset::saoComponentParamDist(Int allowMergeLeft, Int all
     m_pcEntropyCoder->encodeSaoOffset(&saoLcuParamRdo, yCbCr);
 
     estRate = m_pcEntropyCoder->getNumberOfWrittenBits();
-    m_dCost[yCbCr][typeIdx] = (Double)((Double)estDist + lambda * (Double) estRate);
+    m_dCost[yCbCr][typeIdx] = (Double)((Double)estDist + lambda * (Double) estRate); //标准计算
 
-    if(m_dCost[yCbCr][typeIdx] < dCostPartBest)
+    if(m_dCost[yCbCr][typeIdx] < dCostPartBest) //设置最优的Cost
     {
       dCostPartBest = m_dCost[yCbCr][typeIdx];
       copySaoUnit(saoLcuParam, &saoLcuParamRdo );
@@ -2290,14 +2290,14 @@ Void TEncSampleAdaptiveOffset::saoComponentParamDist(Int allowMergeLeft, Int all
 
   // merge left or merge up
 
-  for (Int idxNeighbor=0;idxNeighbor<2;idxNeighbor++) 
+  for (Int idxNeighbor=0;idxNeighbor<2;idxNeighbor++) // 0 1
   {
     saoLcuParamNeighbor = NULL;
-    if (allowMergeLeft && addrLeft>=0 && idxNeighbor ==0)
+    if (allowMergeLeft && addrLeft>=0 && idxNeighbor ==0)//Left存在且允许
     {
       saoLcuParamNeighbor = &(saoParam->saoLcuParam[yCbCr][addrLeft]);
     }
-    else if (allowMergeUp && addrUp>=0 && idxNeighbor ==1)
+    else if (allowMergeUp && addrUp>=0 && idxNeighbor ==1)//Up存在且允许
     {
       saoLcuParamNeighbor = &(saoParam->saoLcuParam[yCbCr][addrUp]);
     }

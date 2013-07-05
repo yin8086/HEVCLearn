@@ -72,14 +72,14 @@ protected:
   Void xSetEdgefilterPU           ( TComDataCU* pcCU, UInt uiAbsZorderIdx );
   Void xGetBoundaryStrengthSingle ( TComDataCU* pcCU, Int iDir, UInt uiPartIdx );
   UInt xCalcBsIdx                 ( TComDataCU* pcCU, UInt uiAbsZorderIdx, Int iDir, Int iEdgeIdx, Int iBaseUnitIdx )
-  {
+  {// 计算相应Idx，如果
     TComPic* const pcPic = pcCU->getPic();
     const UInt uiLCUWidthInBaseUnits = pcPic->getNumPartInWidth();
-    if( iDir == 0 )
+    if( iDir == 0 ) //Ver,这种情况下扫描一列
     {
       return g_auiRasterToZscan[g_auiZscanToRaster[uiAbsZorderIdx] + iBaseUnitIdx * uiLCUWidthInBaseUnits + iEdgeIdx ];
     }
-    else
+    else // Hor，这种情况下扫描一行
     {
       return g_auiRasterToZscan[g_auiZscanToRaster[uiAbsZorderIdx] + iEdgeIdx * uiLCUWidthInBaseUnits + iBaseUnitIdx ];
     }

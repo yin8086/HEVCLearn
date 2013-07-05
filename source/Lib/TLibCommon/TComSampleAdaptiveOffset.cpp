@@ -158,31 +158,31 @@ Void TComSampleAdaptiveOffset::create( UInt uiSourceWidth, UInt uiSourceHeight, 
 
   m_uiMaxCUWidth  = uiMaxCUWidth;
   m_uiMaxCUHeight = uiMaxCUHeight;
-
+  //LCU in Width,不足补齐
   m_iNumCuInWidth  = m_iPicWidth / m_uiMaxCUWidth;
   m_iNumCuInWidth += ( m_iPicWidth % m_uiMaxCUWidth ) ? 1 : 0;
-
+  //LCU in Height
   m_iNumCuInHeight  = m_iPicHeight / m_uiMaxCUHeight;
   m_iNumCuInHeight += ( m_iPicHeight % m_uiMaxCUHeight ) ? 1 : 0;
-
+  //一刀切两半，能切几刀，即划分的深度（次数），WIdith或者Height
   Int iMaxSplitLevelHeight = (Int)(logf((Float)m_iNumCuInHeight)/logf(2.0));
   Int iMaxSplitLevelWidth  = (Int)(logf((Float)m_iNumCuInWidth )/logf(2.0));
-
+  // 取出最小值
   m_uiMaxSplitLevel = (iMaxSplitLevelHeight < iMaxSplitLevelWidth)?(iMaxSplitLevelHeight):(iMaxSplitLevelWidth);
   m_uiMaxSplitLevel = (m_uiMaxSplitLevel< m_uiMaxDepth)?(m_uiMaxSplitLevel):(m_uiMaxDepth);
   /* various structures are overloaded to store per component data.
    * m_iNumTotalParts must allow for sufficient storage in any allocated arrays */
-  m_iNumTotalParts  = max(3,m_aiNumCulPartsLevel[m_uiMaxSplitLevel]);
-
+  m_iNumTotalParts  = max(3,m_aiNumCulPartsLevel[m_uiMaxSplitLevel]); // 1 5 21 81 341
+  //Y 计算其索引
   UInt uiPixelRangeY = 1 << g_bitDepthY;
-  UInt uiBoRangeShiftY = g_bitDepthY - SAO_BO_BITS;
+  UInt uiBoRangeShiftY = g_bitDepthY - SAO_BO_BITS; //Band Offset中一个Band的取值宽度
 
   m_lumaTableBo = new Pel [uiPixelRangeY];
-  for (Int k2=0; k2<uiPixelRangeY; k2++)
-  {
+  for (Int k2=0; k2<uiPixelRangeY; k2++) //1 -> 32
+  {//t[i] = 1 + i >> 3 ，本来这里采样到(0-31)，但这里实际上每4个Band又作为一块，一块，对应高位32个Class
     m_lumaTableBo[k2] = 1 + (k2>>uiBoRangeShiftY);
   }
-
+  //CbCr 同上
   UInt uiPixelRangeC = 1 << g_bitDepthC;
   UInt uiBoRangeShiftC = g_bitDepthC - SAO_BO_BITS;
 
@@ -208,24 +208,24 @@ Void TComSampleAdaptiveOffset::create( UInt uiSourceWidth, UInt uiSourceHeight, 
 
   m_pClipTableBase = new Pel[uiMaxY+2*iCRangeExt];
   m_iOffsetBo      = new Int[uiMaxY+2*iCRangeExt];
-
+  // 0....0,uiMinY+iCRangeExt个
   for(i=0;i<(uiMinY+iCRangeExt);i++)
   {
     m_pClipTableBase[i] = uiMinY;
   }
-
+  // uiMinY 1 2 ... uiMaxY - 1
   for(i=uiMinY+iCRangeExt;i<(uiMaxY+  iCRangeExt);i++)
   {
     m_pClipTableBase[i] = i-iCRangeExt;
   }
-
+  // uiMaxY ... uiMaxY, 共iCRangeExt个
   for(i=uiMaxY+iCRangeExt;i<(uiMaxY+2*iCRangeExt);i++)
   {
     m_pClipTableBase[i] = uiMaxY;
   }
-
+  // 0 1 .. 处开始，上述表的第二部分
   m_pClipTable = &(m_pClipTableBase[iCRangeExt]);
-
+  //Cb Cr基本同上
   UInt uiMaxC  = (1 << g_bitDepthC) - 1;
   UInt uiMinC  = 0;
 

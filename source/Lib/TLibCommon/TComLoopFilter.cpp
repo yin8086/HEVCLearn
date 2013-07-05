@@ -128,9 +128,9 @@ Void TComLoopFilter::destroy()
  */
 Void TComLoopFilter::loopFilterPic( TComPic* pcPic )
 {
-  // Horizontal filtering
+  // Horizontal filtering, 水平
   for ( UInt uiCUAddr = 0; uiCUAddr < pcPic->getNumCUsInFrame(); uiCUAddr++ )
-  {
+  { //(所有LCU)
     TComDataCU* pcCU = pcPic->getCU( uiCUAddr );
 
     ::memset( m_aapucBS       [EDGE_VER], 0, sizeof( UChar ) * m_uiNumPartitions );
@@ -140,7 +140,7 @@ Void TComLoopFilter::loopFilterPic( TComPic* pcPic )
     xDeblockCU( pcCU, 0, 0, EDGE_VER );
   }
 
-  // Vertical filtering
+  // Vertical filtering, 垂直
   for ( UInt uiCUAddr = 0; uiCUAddr < pcPic->getNumCUsInFrame(); uiCUAddr++ )
   {
     TComDataCU* pcCU = pcPic->getCU( uiCUAddr );
@@ -171,12 +171,12 @@ Void TComLoopFilter::xDeblockCU( TComDataCU* pcCU, UInt uiAbsZorderIdx, UInt uiD
   }
   TComPic* pcPic     = pcCU->getPic();
   UInt uiCurNumParts = pcPic->getNumPartInCU() >> (uiDepth<<1);
-  UInt uiQNumParts   = uiCurNumParts>>2;
+  UInt uiQNumParts   = uiCurNumParts>>2; // 分4块
   
-  if( pcCU->getDepth(uiAbsZorderIdx) > uiDepth )
+  if( pcCU->getDepth(uiAbsZorderIdx) > uiDepth ) // 未到达CU制定深度
   {
     for ( UInt uiPartIdx = 0; uiPartIdx < 4; uiPartIdx++, uiAbsZorderIdx+=uiQNumParts )
-    {
+    { // 递归，处理子CU
       UInt uiLPelX   = pcCU->getCUPelX() + g_auiRasterToPelX[ g_auiZscanToRaster[uiAbsZorderIdx] ];
       UInt uiTPelY   = pcCU->getCUPelY() + g_auiRasterToPelY[ g_auiZscanToRaster[uiAbsZorderIdx] ];
       if( ( uiLPelX < pcCU->getSlice()->getSPS()->getPicWidthInLumaSamples() ) && ( uiTPelY < pcCU->getSlice()->getSPS()->getPicHeightInLumaSamples() ) )
@@ -187,17 +187,17 @@ Void TComLoopFilter::xDeblockCU( TComDataCU* pcCU, UInt uiAbsZorderIdx, UInt uiD
     return;
   }
   
-  xSetLoopfilterParam( pcCU, uiAbsZorderIdx );
+  xSetLoopfilterParam( pcCU, uiAbsZorderIdx ); // 设定参数，左侧，上侧边界是否需要Filter
   
   xSetEdgefilterTU   ( pcCU, uiAbsZorderIdx , uiAbsZorderIdx, uiDepth );
   xSetEdgefilterPU   ( pcCU, uiAbsZorderIdx );
   
   Int iDir = Edge;
   for( UInt uiPartIdx = uiAbsZorderIdx; uiPartIdx < uiAbsZorderIdx + uiCurNumParts; uiPartIdx++ )
-  {
+  {//一个个Units循环
     UInt uiBSCheck;
-    if( (g_uiMaxCUWidth >> g_uiMaxCUDepth) == 4 ) 
-    {
+    if( (g_uiMaxCUWidth >> g_uiMaxCUDepth) == 4 ) //一般成立，最小快为4x4
+    {//! 对于垂直边界滤波的情况，检测partition是否属于左边界(uiPart；对于水平边界滤波的情况，检测partition是否属于上边界
       uiBSCheck = (iDir == EDGE_VER && uiPartIdx%2 == 0) || (iDir == EDGE_HOR && (uiPartIdx-((uiPartIdx>>2)<<2))/2 == 0);
     }
     else
@@ -205,19 +205,19 @@ Void TComLoopFilter::xDeblockCU( TComDataCU* pcCU, UInt uiAbsZorderIdx, UInt uiD
       uiBSCheck = 1;
     }
     
-    if ( m_aapbEdgeFilter[iDir][uiPartIdx] && uiBSCheck )
-    {
+    if ( m_aapbEdgeFilter[iDir][uiPartIdx] && uiBSCheck ) //根据是否需要Check以及边界设置情况处理
+    {// 通过则获取滤波强度
       xGetBoundaryStrengthSingle ( pcCU, iDir, uiPartIdx );
     }
   }
   
-  UInt uiPelsInPart = g_uiMaxCUWidth >> g_uiMaxCUDepth;
-  UInt PartIdxIncr = DEBLOCK_SMALLEST_BLOCK / uiPelsInPart ? DEBLOCK_SMALLEST_BLOCK / uiPelsInPart : 1 ;
+  UInt uiPelsInPart = g_uiMaxCUWidth >> g_uiMaxCUDepth; //最小单元大小
+  UInt PartIdxIncr = DEBLOCK_SMALLEST_BLOCK / uiPelsInPart ? DEBLOCK_SMALLEST_BLOCK / uiPelsInPart : 1 ; //最小Deblock块是几个partition
   
-  UInt uiSizeInPU = pcPic->getNumPartInWidth()>>(uiDepth);
+  UInt uiSizeInPU = pcPic->getNumPartInWidth()>>(uiDepth); //含义应该为一个LCU上，有几个partition
   
-  for ( UInt iEdge = 0; iEdge < uiSizeInPU ; iEdge+=PartIdxIncr)
-  {
+  for ( UInt iEdge = 0; iEdge < uiSizeInPU ; iEdge+=PartIdxIncr) //一次一个Deblocking(8x8)块，完成LCU内一行或一列的扫描
+  { //以Ver为例子，这里横向扫描8x8块，内部纵向扫描4x4块，对每个4x4往左侧的边界滤波
     xEdgeFilterLuma     ( pcCU, uiAbsZorderIdx, uiDepth, iDir, iEdge );
     if ( (uiPelsInPart>DEBLOCK_SMALLEST_BLOCK) || (iEdge % ( (DEBLOCK_SMALLEST_BLOCK<<1)/uiPelsInPart ) ) == 0 )
     {
@@ -227,7 +227,7 @@ Void TComLoopFilter::xDeblockCU( TComDataCU* pcCU, UInt uiAbsZorderIdx, UInt uiD
 }
 
 Void TComLoopFilter::xSetEdgefilterMultiple( TComDataCU* pcCU, UInt uiScanIdx, UInt uiDepth, Int iDir, Int iEdgeIdx, Bool bValue,UInt uiWidthInBaseUnits, UInt uiHeightInBaseUnits )
-{  
+{  //iEdgeIdx = 0 ，即处理首行，或者首列，为他们设置Deblocking标志
   if ( uiWidthInBaseUnits == 0 )
   {
     uiWidthInBaseUnits  = pcCU->getPic()->getNumPartInWidth () >> uiDepth;
@@ -270,7 +270,7 @@ Void TComLoopFilter::xSetEdgefilterTU( TComDataCU* pcCU, UInt absTUPartIdx, UInt
   
   UInt uiWidthInBaseUnits  = trWidth / (g_uiMaxCUWidth >> g_uiMaxCUDepth);
   UInt uiHeightInBaseUnits = trHeight / (g_uiMaxCUWidth >> g_uiMaxCUDepth);
-
+  // 垂直水平边界设置，（第一行，第一列）
   xSetEdgefilterMultiple( pcCU, absTUPartIdx, uiDepth, EDGE_VER, 0, m_stLFCUParam.bInternalEdge, uiWidthInBaseUnits, uiHeightInBaseUnits );
   xSetEdgefilterMultiple( pcCU, absTUPartIdx, uiDepth, EDGE_HOR, 0, m_stLFCUParam.bInternalEdge, uiWidthInBaseUnits, uiHeightInBaseUnits );
 }
@@ -284,11 +284,11 @@ Void TComLoopFilter::xSetEdgefilterPU( TComDataCU* pcCU, UInt uiAbsZorderIdx )
   const UInt uiHHeightInBaseUnits = uiHeightInBaseUnits >> 1;
   const UInt uiQWidthInBaseUnits  = uiWidthInBaseUnits  >> 2;
   const UInt uiQHeightInBaseUnits = uiHeightInBaseUnits >> 2;
-  
+  // 对整个PU的大边界进行设置
   xSetEdgefilterMultiple( pcCU, uiAbsZorderIdx, uiDepth, EDGE_VER, 0, m_stLFCUParam.bLeftEdge );
   xSetEdgefilterMultiple( pcCU, uiAbsZorderIdx, uiDepth, EDGE_HOR, 0, m_stLFCUParam.bTopEdge );
   
-  switch ( pcCU->getPartitionSize( uiAbsZorderIdx ) )
+  switch ( pcCU->getPartitionSize( uiAbsZorderIdx ) ) //根据具体情况会在此进行一次设置
   {
     case SIZE_2Nx2N:
     {
@@ -339,27 +339,27 @@ Void TComLoopFilter::xSetEdgefilterPU( TComDataCU* pcCU, UInt uiAbsZorderIdx )
 
 
 Void TComLoopFilter::xSetLoopfilterParam( TComDataCU* pcCU, UInt uiAbsZorderIdx )
-{
+{ //完成左侧，上侧边界的确定
   UInt uiX           = pcCU->getCUPelX() + g_auiRasterToPelX[ g_auiZscanToRaster[ uiAbsZorderIdx ] ];
   UInt uiY           = pcCU->getCUPelY() + g_auiRasterToPelY[ g_auiZscanToRaster[ uiAbsZorderIdx ] ];
-  
+  // uiX, uiY就是LCU内的坐标
   TComDataCU* pcTempCU;
   UInt        uiTempPartIdx;
 
   m_stLFCUParam.bInternalEdge = ! pcCU->getSlice()->getDeblockingFilterDisable();
   
-  if ( (uiX == 0) || pcCU->getSlice()->getDeblockingFilterDisable() )
+  if ( (uiX == 0) || pcCU->getSlice()->getDeblockingFilterDisable() )//左侧边界存在可能性
   {
-    m_stLFCUParam.bLeftEdge = false;
+    m_stLFCUParam.bLeftEdge = false; 
   }
   else
   {
     m_stLFCUParam.bLeftEdge = true;
   }
-  if ( m_stLFCUParam.bLeftEdge )
+  if ( m_stLFCUParam.bLeftEdge ) //左侧可能存在
   {
     pcTempCU = pcCU->getPULeft( uiTempPartIdx, uiAbsZorderIdx, !pcCU->getSlice()->getLFCrossSliceBoundaryFlag(), !m_bLFCrossTileBoundary);
-    if ( pcTempCU )
+    if ( pcTempCU ) //看看真的存不存在
     {
       m_stLFCUParam.bLeftEdge = true;
     }
@@ -368,7 +368,7 @@ Void TComLoopFilter::xSetLoopfilterParam( TComDataCU* pcCU, UInt uiAbsZorderIdx 
       m_stLFCUParam.bLeftEdge = false;
     }
   }
-  
+  // 同上
   if ( (uiY == 0 ) || pcCU->getSlice()->getDeblockingFilterDisable() )
   {
     m_stLFCUParam.bTopEdge = false;
@@ -404,7 +404,7 @@ Void TComLoopFilter::xGetBoundaryStrengthSingle ( TComDataCU* pcCU, Int iDir, UI
   UInt uiBs = 0;
   
   //-- Calculate Block Index
-  if (iDir == EDGE_VER)
+  if (iDir == EDGE_VER) //垂直滤波，找左侧的PU（为何PU，因为TU是隐式划分，没有保存信息）
   {
     pcCUP = pcCUQ->getPULeft(uiPartP, uiPartQ, !pcCU->getSlice()->getLFCrossSliceBoundaryFlag(), !m_bLFCrossTileBoundary);
   }
@@ -414,7 +414,7 @@ Void TComLoopFilter::xGetBoundaryStrengthSingle ( TComDataCU* pcCU, Int iDir, UI
   }
   
   //-- Set BS for Intra MB : BS = 4 or 3
-  if ( pcCUP->isIntra(uiPartP) || pcCUQ->isIntra(uiPartQ) )
+  if ( pcCUP->isIntra(uiPartP) || pcCUQ->isIntra(uiPartQ) ) // 只要有一个Intra就是2
   {
     uiBs = 2;
   }
@@ -532,7 +532,7 @@ Void TComLoopFilter::xEdgeFilterLuma( TComDataCU* pcCU, UInt uiAbsZorderIdx, UIn
   Int iQP_Q = 0;
   UInt uiNumParts = pcCU->getPic()->getNumPartInWidth()>>uiDepth;
   
-  UInt  uiPelsInPart = g_uiMaxCUWidth >> g_uiMaxCUDepth;
+  UInt  uiPelsInPart = g_uiMaxCUWidth >> g_uiMaxCUDepth; //64>>4=4,最小单元大小
   UInt  uiBsAbsIdx = 0, uiBs = 0;
   Int   iOffset, iSrcStep;
   
@@ -548,27 +548,27 @@ Void TComLoopFilter::xEdgeFilterLuma( TComDataCU* pcCU, UInt uiAbsZorderIdx, UIn
 
   if (iDir == EDGE_VER)
   {
-    iOffset = 1;
+    iOffset = 1; // 左右关系，相差1
     iSrcStep = iStride;
-    piTmpSrc += iEdge*uiPelsInPart;
+    piTmpSrc += iEdge*uiPelsInPart; //这项水平线对应位置，先在列上右走
   }
   else  // (iDir == EDGE_HOR)
   {
-    iOffset = iStride;
+    iOffset = iStride; // 上下关系，相差Stride
     iSrcStep = 1;
-    piTmpSrc += iEdge*uiPelsInPart*iStride;
+    piTmpSrc += iEdge*uiPelsInPart*iStride; //指向垂直方向某一位置，先在行上，下走
   }
   
-  for ( UInt iIdx = 0; iIdx < uiNumParts; iIdx++ )
-  {
-    uiBsAbsIdx = xCalcBsIdx( pcCU, uiAbsZorderIdx, iDir, iEdge, iIdx);
+  for ( UInt iIdx = 0; iIdx < uiNumParts; iIdx++ ) //边界上所有的partition,Ver的话一列，Hor的话一行
+  { //Ver时，纵向扫描4x4partition
+    uiBsAbsIdx = xCalcBsIdx( pcCU, uiAbsZorderIdx, iDir, iEdge, iIdx); 
     uiBs = m_aapucBS[iDir][uiBsAbsIdx];
-    if ( uiBs )
+    if ( uiBs ) //查看此个partition的滤波强度
     {
       iQP_Q = pcCU->getQP( uiBsAbsIdx );
       uiPartQIdx = uiBsAbsIdx;
       // Derive neighboring PU index
-      if (iDir == EDGE_VER)
+      if (iDir == EDGE_VER) //取出当前扫描的4x4块，左侧一块
       {
         pcCUP = pcCUQ->getPULeft (uiPartPIdx, uiPartQIdx,!pcCU->getSlice()->getLFCrossSliceBoundaryFlag(), !m_bLFCrossTileBoundary);
       }
@@ -578,8 +578,8 @@ Void TComLoopFilter::xEdgeFilterLuma( TComDataCU* pcCU, UInt uiAbsZorderIdx, UIn
       }
 
       iQP_P = pcCUP->getQP(uiPartPIdx);
-      iQP = (iQP_P + iQP_Q + 1) >> 1;
-      Int iBitdepthScale = 1 << (g_bitDepthY-8);
+      iQP = (iQP_P + iQP_Q + 1) >> 1; //求个均值 8-288
+      Int iBitdepthScale = 1 << (g_bitDepthY-8); // (8-290)
       
       Int iIndexTC = Clip3(0, MAX_QP+DEFAULT_INTRA_TC_OFFSET, Int(iQP + DEFAULT_INTRA_TC_OFFSET*(uiBs-1) + (tcOffsetDiv2 << 1)));
       Int iIndexB = Clip3(0, MAX_QP, iQP + (betaOffsetDiv2 << 1));
@@ -589,10 +589,10 @@ Void TComLoopFilter::xEdgeFilterLuma( TComDataCU* pcCU, UInt uiAbsZorderIdx, UIn
       Int iSideThreshold = (iBeta+(iBeta>>1))>>3;
       Int iThrCut = iTc*10;
 
-      UInt  uiBlocksInPart = uiPelsInPart / 4 ? uiPelsInPart / 4 : 1;
+      UInt  uiBlocksInPart = uiPelsInPart / 4 ? uiPelsInPart / 4 : 1; // 假设还能再分，一般为1
       for (UInt iBlkIdx = 0; iBlkIdx<uiBlocksInPart; iBlkIdx ++)
-      {
-        Int dp0 = xCalcDP( piTmpSrc+iSrcStep*(iIdx*uiPelsInPart+iBlkIdx*4+0), iOffset);
+      {//Ver的话p(0,0) p(3,0)(row, col)，即0行，以及3行处左边，以及右边3个元素的中值计算
+        Int dp0 = xCalcDP( piTmpSrc+iSrcStep*(iIdx*uiPelsInPart+iBlkIdx*4+0), iOffset); //Ver是，水平走完，这里是垂直向下走
         Int dq0 = xCalcDQ( piTmpSrc+iSrcStep*(iIdx*uiPelsInPart+iBlkIdx*4+0), iOffset);
         Int dp3 = xCalcDP( piTmpSrc+iSrcStep*(iIdx*uiPelsInPart+iBlkIdx*4+3), iOffset);
         Int dq3 = xCalcDQ( piTmpSrc+iSrcStep*(iIdx*uiPelsInPart+iBlkIdx*4+3), iOffset);
@@ -616,14 +616,14 @@ Void TComLoopFilter::xEdgeFilterLuma( TComDataCU* pcCU, UInt uiAbsZorderIdx, UIn
 
         if (d < iBeta)
         { 
-          Bool bFilterP = (dp < iSideThreshold);
+          Bool bFilterP = (dp < iSideThreshold); //进行滤波
           Bool bFilterQ = (dq < iSideThreshold);
-          
+          //VEr:通过对应行上，几个元素的特性，判断是否进行强滤波
           Bool sw =  xUseStrongFiltering( iOffset, 2*d0, iBeta, iTc, piTmpSrc+iSrcStep*(iIdx*uiPelsInPart+iBlkIdx*4+0))
           && xUseStrongFiltering( iOffset, 2*d3, iBeta, iTc, piTmpSrc+iSrcStep*(iIdx*uiPelsInPart+iBlkIdx*4+3));
           
           for ( Int i = 0; i < DEBLOCK_SMALLEST_BLOCK/2; i++)
-          {
+          { //一个个像素进行滤波,Ver时候就是4x4块，纵向4个像素
             xPelFilterLuma( piTmpSrc+iSrcStep*(iIdx*uiPelsInPart+iBlkIdx*4+i), iOffset, iTc, sw, bPartPNoFilter, bPartQNoFilter, iThrCut, bFilterP, bFilterQ);
           }
         }
@@ -761,7 +761,7 @@ Void TComLoopFilter::xEdgeFilterChroma( TComDataCU* pcCU, UInt uiAbsZorderIdx, U
 __inline Void TComLoopFilter::xPelFilterLuma( Pel* piSrc, Int iOffset, Int tc , Bool sw, Bool bPartPNoFilter, Bool bPartQNoFilter, Int iThrCut, Bool bFilterSecondP, Bool bFilterSecondQ)
 {
   Int delta;
-  
+  //周围各4个像素
   Pel m4  = piSrc[0];
   Pel m3  = piSrc[-iOffset];
   Pel m5  = piSrc[ iOffset];
@@ -771,14 +771,14 @@ __inline Void TComLoopFilter::xPelFilterLuma( Pel* piSrc, Int iOffset, Int tc , 
   Pel m7  = piSrc[ iOffset*3];
   Pel m0  = piSrc[-iOffset*4];
 
-  if (sw)
+  if (sw) //8-330左右
   {
-    piSrc[-iOffset]   = Clip3(m3-2*tc, m3+2*tc, ((m1 + 2*m2 + 2*m3 + 2*m4 + m5 + 4) >> 3));
-    piSrc[0]          = Clip3(m4-2*tc, m4+2*tc, ((m2 + 2*m3 + 2*m4 + 2*m5 + m6 + 4) >> 3));
-    piSrc[-iOffset*2] = Clip3(m2-2*tc, m2+2*tc, ((m1 + m2 + m3 + m4 + 2)>>2));
-    piSrc[ iOffset]   = Clip3(m5-2*tc, m5+2*tc, ((m3 + m4 + m5 + m6 + 2)>>2));
-    piSrc[-iOffset*3] = Clip3(m1-2*tc, m1+2*tc, ((2*m0 + 3*m1 + m2 + m3 + m4 + 4 )>>3));
-    piSrc[ iOffset*2] = Clip3(m6-2*tc, m6+2*tc, ((m3 + m4 + m5 + 3*m6 + 2*m7 +4 )>>3));
+    piSrc[-iOffset]   = Clip3(m3-2*tc, m3+2*tc, ((m1 + 2*m2 + 2*m3 + 2*m4 + m5 + 4) >> 3)); // -1 p0
+    piSrc[0]          = Clip3(m4-2*tc, m4+2*tc, ((m2 + 2*m3 + 2*m4 + 2*m5 + m6 + 4) >> 3)); // 0 q0
+    piSrc[-iOffset*2] = Clip3(m2-2*tc, m2+2*tc, ((m1 + m2 + m3 + m4 + 2)>>2)); // -2 p1
+    piSrc[ iOffset]   = Clip3(m5-2*tc, m5+2*tc, ((m3 + m4 + m5 + m6 + 2)>>2)); // 1 q1
+    piSrc[-iOffset*3] = Clip3(m1-2*tc, m1+2*tc, ((2*m0 + 3*m1 + m2 + m3 + m4 + 4 )>>3)); // -3 p2
+    piSrc[ iOffset*2] = Clip3(m6-2*tc, m6+2*tc, ((m3 + m4 + m5 + 3*m6 + 2*m7 +4 )>>3)); //2 q2
   }
   else
   {
@@ -788,31 +788,31 @@ __inline Void TComLoopFilter::xPelFilterLuma( Pel* piSrc, Int iOffset, Int tc , 
     if ( abs(delta) < iThrCut )
     {
       delta = Clip3(-tc, tc, delta);        
-      piSrc[-iOffset] = ClipY((m3+delta));
-      piSrc[0] = ClipY((m4-delta));
+      piSrc[-iOffset] = ClipY((m3+delta)); // -1 p0
+      piSrc[0] = ClipY((m4-delta)); //0 q0
 
       Int tc2 = tc>>1;
       if(bFilterSecondP)
       {
         Int delta1 = Clip3(-tc2, tc2, (( ((m1+m3+1)>>1)- m2+delta)>>1));
-        piSrc[-iOffset*2] = ClipY((m2+delta1));
+        piSrc[-iOffset*2] = ClipY((m2+delta1)); //-2 p1
       }
       if(bFilterSecondQ)
       {
         Int delta2 = Clip3(-tc2, tc2, (( ((m6+m4+1)>>1)- m5-delta)>>1));
-        piSrc[ iOffset] = ClipY((m5+delta2));
+        piSrc[ iOffset] = ClipY((m5+delta2)); //1 q1
       }
     }
   }
 
   if(bPartPNoFilter)
-  {
-    piSrc[-iOffset] = m3;
+  {//p0->p2
+    piSrc[-iOffset] = m3;  
     piSrc[-iOffset*2] = m2;
     piSrc[-iOffset*3] = m1;
   }
   if(bPartQNoFilter)
-  {
+  { //q0->q2
     piSrc[0] = m4;
     piSrc[ iOffset] = m5;
     piSrc[ iOffset*2] = m6;

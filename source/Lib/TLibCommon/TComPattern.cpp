@@ -337,11 +337,11 @@ Void TComPattern::initAdiPatternChroma( TComDataCU* pcCU, UInt uiZorderIdxInPart
   Int   iUnitSize = 0;
   Int   iNumUnitsInCu = 0;
   Int   iTotalUnits = 0;
-  Bool  bNeighborFlags[4 * MAX_NUM_SPU_W + 1];
-  Int   iNumIntraNeighbor = 0;
+  Bool  bNeighborFlags[4 * MAX_NUM_SPU_W + 1];//> (四个方向样点可用性)4 * 128/4 + 1 = 129
+  Int   iNumIntraNeighbor = 0;//> 给可用相邻快计数
   
   UInt uiPartIdxLT, uiPartIdxRT, uiPartIdxLB;
-  
+  // 左上，右上，左下角的ZOrder,以(4x4)块为单位
   pcCU->deriveLeftRightTopIdxAdi( uiPartIdxLT, uiPartIdxRT, uiZorderIdxInPart, uiPartDepth );
   pcCU->deriveLeftBottomIdxAdi  ( uiPartIdxLB,              uiZorderIdxInPart, uiPartDepth );
   

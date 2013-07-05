@@ -2176,13 +2176,13 @@ TEncSearch::xRecurIntraChromaCodingQT( TComDataCU*  pcCU,
     UInt uiLog2TrSize = g_aucConvertToBit[ pcCU->getSlice()->getSPS()->getMaxCUWidth() >> uiFullDepth ] + 2;
 
     UInt actualTrDepth = uiTrDepth;
-    if( uiLog2TrSize == 2 )
+    if( uiLog2TrSize == 2 ) //没有2x2的色度快，哪怕是4x4亮度快，这里也要处理4x4的色度块
     {
       assert( uiTrDepth > 0 );
       actualTrDepth--;
       UInt uiQPDiv = pcCU->getPic()->getNumPartInCU() >> ( ( pcCU->getDepth( 0 ) + actualTrDepth) << 1 );
       Bool bFirstQ = ( ( uiAbsPartIdx % uiQPDiv ) == 0 );
-      if( !bFirstQ )
+      if( !bFirstQ ) //实际上是4个2x2色度块一起作为4x4块处理，只处理第一个就行
       {
         return;
       }
@@ -2785,7 +2785,7 @@ TEncSearch::estIntraPredChromaQT( TComDataCU* pcCU,
   
   //----- init mode list -----
   UInt  uiMinMode = 0;
-  UInt  uiModeList[ NUM_CHROMA_MODE ];
+  UInt  uiModeList[ NUM_CHROMA_MODE ]; //5种色度预测模式
   pcCU->getAllowedChromaDir( 0, uiModeList );
   UInt  uiMaxMode = NUM_CHROMA_MODE;
 
@@ -2807,7 +2807,7 @@ TEncSearch::estIntraPredChromaQT( TComDataCU* pcCU,
       m_pcRDGoOnSbacCoder->load( m_pppcRDSbacCoder[uiDepth][CI_CURR_BEST] );
     }
     UInt    uiBits = xGetIntraBitsQT( pcCU,   0, 0, false, true, false );
-    Double  dCost  = m_pcRdCost->calcRdCost( uiBits, uiDist );
+    Double  dCost  = m_pcRdCost->calcRdCost( uiBits, uiDist ); //计算RD
     
     //----- compare -----
     if( dCost < dBestCost )
@@ -2831,7 +2831,7 @@ TEncSearch::estIntraPredChromaQT( TComDataCU* pcCU,
   ::memcpy( pcCU->getTransformSkip( TEXT_CHROMA_U ), m_puhQTTempTransformSkipFlag[1], uiQPN * sizeof( UChar ) );
   ::memcpy( pcCU->getTransformSkip( TEXT_CHROMA_V ), m_puhQTTempTransformSkipFlag[2], uiQPN * sizeof( UChar ) );
   pcCU->setChromIntraDirSubParts( uiBestMode, 0, uiDepth );
-  pcCU->getTotalDistortion      () += uiBestDist - uiPreCalcDistC;
+  pcCU->getTotalDistortion      () += uiBestDist - uiPreCalcDistC; //根据亮度预测得到的提前预测Dist修正总Dist
   
   //----- restore context models -----
   if( m_bUseSBACRD )

@@ -1608,6 +1608,7 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
     }
   }
 
+  /*
   for(int i = 0; i < 8; i++)
   {
     for(int j = 0; j < 8; j++)
@@ -1617,6 +1618,7 @@ Void TComTrQuant::xRateDistOptQuant                 ( TComDataCU*               
     }
     std::cout<<endl;
   }
+  */
   const UInt uiCGSize = (1 << MLS_CG_SIZE);         // 16 Group大小即4x4
   Double pdCostCoeffGroupSig[ MLS_GRP_NUM ];
   UInt uiSigCoeffGroupFlag[ MLS_GRP_NUM ];

@@ -1073,7 +1073,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
       m_pcCuEncoder->compressCU( pcCU ); //> 进行当前CU的编码
 
 #if RATE_CONTROL_LAMBDA_DOMAIN
-      if ( m_pcCfg->getUseRateCtrl() )
+      if ( m_pcCfg->getUseRateCtrl() ) //> 码率控制
       {
         UInt SAD    = m_pcCuEncoder->getLCUPredictionSAD();
         Int height  = min( pcSlice->getSPS()->getMaxCUHeight(),pcSlice->getSPS()->getPicHeightInLumaSamples() - uiCUAddr / rpcPic->getFrameWidthInCU() * pcSlice->getSPS()->getMaxCUHeight() );
@@ -1117,7 +1117,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
       pppcRDSbacCoder->setBinCountingEnableFlag( true );
       m_pcBitCounter->resetBits();
       pppcRDSbacCoder->setBinsCoded( 0 );
-      m_pcCuEncoder->encodeCU( pcCU );
+      m_pcCuEncoder->encodeCU( pcCU ); //设置编码器，然后进行编码
 
       pppcRDSbacCoder->setBinCountingEnableFlag( false );
       if (m_pcCfg->getSliceMode()==FIXED_NUMBER_OF_BYTES && ( ( pcSlice->getSliceBits() + m_pcEntropyCoder->getNumberOfWrittenBits() ) ) > m_pcCfg->getSliceArgument()<<3)
@@ -1158,7 +1158,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
       }
     }
     
-    m_uiPicTotalBits += pcCU->getTotalBits();
+    m_uiPicTotalBits += pcCU->getTotalBits(); //继续统计Bits,RD,Distor
     m_dPicRdCost     += pcCU->getTotalCost();
     m_uiPicDist      += pcCU->getTotalDistortion();
 #if !RATE_CONTROL_LAMBDA_DOMAIN
@@ -1168,7 +1168,7 @@ Void TEncSlice::compressSlice( TComPic*& rpcPic )
       m_pcRateCtrl->updataRCUnitStatus();
     }
 #endif
-  }
+  }// 完成Slice 内 CU的循环
   if ((pcSlice->getPPS()->getNumSubstreams() > 1) && !depSliceSegmentsEnabled)
   {
     pcSlice->setNextSlice( true );

@@ -442,7 +442,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
   Bool bSliceStart = pcSlice->getSliceSegmentCurStartCUAddr()>rpcTempCU->getSCUAddr()&&pcSlice->getSliceSegmentCurStartCUAddr()<rpcTempCU->getSCUAddr()+rpcTempCU->getTotalNumPart();
   // Slice结束是否是在CU内
   Bool bSliceEnd = (pcSlice->getSliceSegmentCurEndCUAddr()>rpcTempCU->getSCUAddr()&&pcSlice->getSliceSegmentCurEndCUAddr()<rpcTempCU->getSCUAddr()+rpcTempCU->getTotalNumPart());
-  // Slice的边界处CU是否是补上来的（非真实宽高)
+  // Slice的边界处CU不是补上来的（补上来：非真实宽高)
   Bool bInsidePicture = ( uiRPelX < rpcBestCU->getSlice()->getSPS()->getPicWidthInLumaSamples() ) && ( uiBPelY < rpcBestCU->getSlice()->getSPS()->getPicHeightInLumaSamples() );
   // We need to split, so don't try these modes.
   if(!bSliceEnd && !bSliceStart && bInsidePicture )
@@ -694,13 +694,13 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
             rpcBestCU->getCbf( 0, TEXT_CHROMA_U ) != 0   ||
             rpcBestCU->getCbf( 0, TEXT_CHROMA_V ) != 0     ) // avoid very complex intra if it is unlikely
           {
-            xCheckRDCostIntra( rpcBestCU, rpcTempCU, SIZE_2Nx2N ); //> 开始进行RD的Cost分析
-            rpcTempCU->initEstData( uiDepth, iQP );
-            if( uiDepth == g_uiMaxCUDepth - g_uiAddCUDepth )
+            xCheckRDCostIntra( rpcBestCU, rpcTempCU, SIZE_2Nx2N ); //> 开始进行2Nx2N PU划分的Cost分析，针对rpcTempCU
+            rpcTempCU->initEstData( uiDepth, iQP ); // 实际上就是清空数据
+            if( uiDepth == g_uiMaxCUDepth - g_uiAddCUDepth ) //进行NxN划分PU
             {
               if( rpcTempCU->getWidth(0) > ( 1 << rpcTempCU->getSlice()->getSPS()->getQuadtreeTULog2MinSize() ) )
-              {
-                xCheckRDCostIntra( rpcBestCU, rpcTempCU, SIZE_NxN   );
+              { // 当CU划分到最小，且大于最小量化边长时（一般两个应该同时成立）
+                xCheckRDCostIntra( rpcBestCU, rpcTempCU, SIZE_NxN   ); // 资料中提到的只有CU最小时才允许尝试NxN的PU划分
                 rpcTempCU->initEstData( uiDepth, iQP );
               }
             }
@@ -726,7 +726,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
         }
       }
     }
-
+    // 加入SplitFlag并在此计算RD
     m_pcEntropyCoder->resetBits();
     m_pcEntropyCoder->encodeSplitFlag( rpcBestCU, 0, uiDepth, true );
     rpcBestCU->getTotalBits() += m_pcEntropyCoder->getNumberOfWrittenBits(); // split bits
@@ -748,7 +748,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
     }
 
     // Early CU determination
-    if( m_pcEncCfg->getUseEarlyCU() && rpcBestCU->isSkipped(0) )
+    if( m_pcEncCfg->getUseEarlyCU() && rpcBestCU->isSkipped(0) ) //决定是否要进行CU划分？
     {
       bSubBranch = false;
     }
@@ -821,23 +821,23 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
     {
       iQP = lowestQP;
     }
-    rpcTempCU->initEstData( uiDepth, iQP );
+    rpcTempCU->initEstData( uiDepth, iQP ); //初始化
 
     // further split
-    if( bSubBranch && bTrySplitDQP && uiDepth < g_uiMaxCUDepth - g_uiAddCUDepth )
+    if( bSubBranch && bTrySplitDQP && uiDepth < g_uiMaxCUDepth - g_uiAddCUDepth ) //对CU进行划分
     {
       UChar       uhNextDepth         = uiDepth+1;
-      TComDataCU* pcSubBestPartCU     = m_ppcBestCU[uhNextDepth];
+      TComDataCU* pcSubBestPartCU     = m_ppcBestCU[uhNextDepth]; // 取出指针方便操作，为赋值做准备
       TComDataCU* pcSubTempPartCU     = m_ppcTempCU[uhNextDepth];
 
-      for ( UInt uiPartUnitIdx = 0; uiPartUnitIdx < 4; uiPartUnitIdx++ )
+      for ( UInt uiPartUnitIdx = 0; uiPartUnitIdx < 4; uiPartUnitIdx++ ) // 进行CU的划分
       {
         pcSubBestPartCU->initSubCU( rpcTempCU, uiPartUnitIdx, uhNextDepth, iQP );           // clear sub partition datas or init.
         pcSubTempPartCU->initSubCU( rpcTempCU, uiPartUnitIdx, uhNextDepth, iQP );           // clear sub partition datas or init.
 
         Bool bInSlice = pcSubBestPartCU->getSCUAddr()+pcSubBestPartCU->getTotalNumPart()>pcSlice->getSliceSegmentCurStartCUAddr()&&pcSubBestPartCU->getSCUAddr()<pcSlice->getSliceSegmentCurEndCUAddr();
         if(bInSlice && ( pcSubBestPartCU->getCUPelX() < pcSlice->getSPS()->getPicWidthInLumaSamples() ) && ( pcSubBestPartCU->getCUPelY() < pcSlice->getSPS()->getPicHeightInLumaSamples() ) )
-        {
+        { //在Slice之内，没有跨Slice
           if( m_bUseSBACRD )
           {
             if ( 0 == uiPartUnitIdx) //initialize RD with previous depth buffer
@@ -851,7 +851,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
           }
 
 #if AMP_ENC_SPEEDUP
-          if ( rpcBestCU->isIntra(0) )
+          if ( rpcBestCU->isIntra(0) ) //进行递归编码CU
           {
             xCompressCU( pcSubBestPartCU, pcSubTempPartCU, uhNextDepth, SIZE_NONE );
           }
@@ -864,7 +864,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
 #endif
 
           rpcTempCU->copyPartFrom( pcSubBestPartCU, uiPartUnitIdx, uhNextDepth );         // Keep best part data to current temporary data.
-          xCopyYuv2Tmp( pcSubBestPartCU->getTotalNumPart()*uiPartUnitIdx, uhNextDepth );
+          xCopyYuv2Tmp( pcSubBestPartCU->getTotalNumPart()*uiPartUnitIdx, uhNextDepth ); // 循环把下一层的四个SubCU数据拷进来
         }
         else if (bInSlice)
         {
@@ -1384,6 +1384,7 @@ Void TEncCu::xCheckRDCostIntra( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, 
   m_pcPredSearch  ->estIntraPredChromaQT( rpcTempCU, m_ppcOrigYuv[uiDepth], m_ppcPredYuvTemp[uiDepth], m_ppcResiYuvTemp[uiDepth], m_ppcRecoYuvTemp[uiDepth], uiPreCalcDistC );
   
   m_pcEntropyCoder->resetBits();
+  //开始编码一些玩意儿
   if ( rpcTempCU->getSlice()->getPPS()->getTransquantBypassEnableFlag())
   {
     m_pcEntropyCoder->encodeCUTransquantBypassFlag( rpcTempCU, 0,          true );
@@ -1408,8 +1409,8 @@ Void TEncCu::xCheckRDCostIntra( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, 
   }
   rpcTempCU->getTotalCost() = m_pcRdCost->calcRdCost( rpcTempCU->getTotalBits(), rpcTempCU->getTotalDistortion() );
   
-  xCheckDQP( rpcTempCU );
-  xCheckBestMode(rpcBestCU, rpcTempCU, uiDepth);
+  xCheckDQP( rpcTempCU ); //是否有DQP。多个QP?
+  xCheckBestMode(rpcBestCU, rpcTempCU, uiDepth);//交换CU指针,指定层Pred，Recon,那level呢？
 }
 
 /** Check R-D costs for a CU with PCM mode. 
@@ -1467,9 +1468,9 @@ Void TEncCu::xCheckIntraPCM( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU )
 Void TEncCu::xCheckBestMode( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt uiDepth )
 {
   if( rpcTempCU->getTotalCost() < rpcBestCU->getTotalCost() )
-  {
+  {//交换CU指针，Pred指针，Recon指针
     TComYuv* pcYuv;
-    // Change Information data
+    // Change Information data， 典型交换算法，仅仅交换指针
     TComDataCU* pcCU = rpcBestCU;
     rpcBestCU = rpcTempCU;
     rpcTempCU = pcCU;
