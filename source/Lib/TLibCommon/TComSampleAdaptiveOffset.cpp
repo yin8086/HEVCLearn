@@ -803,7 +803,7 @@ Void TComSampleAdaptiveOffset::processSaoBlock(Pel* pDec, Pel* pRest, Int stride
  * \param   iAddr, iSaoType, iYCbCr
  */
 Void TComSampleAdaptiveOffset::processSaoCuOrg(Int iAddr, Int iSaoType, Int iYCbCr)
-{
+{ // 对每个LCU进行处理
   Int x,y;
   TComDataCU *pTmpCu = m_pcPic->getCU(iAddr);
   Pel* pRec;
@@ -841,18 +841,18 @@ Void TComSampleAdaptiveOffset::processSaoCuOrg(Int iAddr, Int iSaoType, Int iYCb
   iLcuHeight    = iLcuHeight   >> iIsChroma;
   uiLPelX       = uiLPelX      >> iIsChroma;
   uiTPelY       = uiTPelY      >> iIsChroma;
-  uiRPelX       = uiLPelX + iLcuWidth  ;
-  uiBPelY       = uiTPelY + iLcuHeight ;
-  uiRPelX       = uiRPelX > iPicWidthTmp  ? iPicWidthTmp  : uiRPelX;
+  uiRPelX       = uiLPelX + iLcuWidth  ; //Right
+  uiBPelY       = uiTPelY + iLcuHeight ; // Below
+  uiRPelX       = uiRPelX > iPicWidthTmp  ? iPicWidthTmp  : uiRPelX; //不超过边界
   uiBPelY       = uiBPelY > iPicHeightTmp ? iPicHeightTmp : uiBPelY;
-  iLcuWidth     = uiRPelX - uiLPelX;
+  iLcuWidth     = uiRPelX - uiLPelX; //实际LCU宽高，不算补齐的
   iLcuHeight    = uiBPelY - uiTPelY;
 
   if(pTmpCu->getPic()==0)
   {
     return;
   }
-  if (iYCbCr == 0)
+  if (iYCbCr == 0) //取地址和Stride
   {
     pRec       = m_pcPic->getPicYuvRec()->getLumaAddr(iAddr);
     iStride    = m_pcPic->getStride();
@@ -872,15 +872,15 @@ Void TComSampleAdaptiveOffset::processSaoCuOrg(Int iAddr, Int iSaoType, Int iYCb
   {
     iCuHeightTmp = (m_uiMaxCUHeight >> iIsChroma);
     iShift = (m_uiMaxCUWidth>> iIsChroma)-1;
-    for (Int i=0;i<iCuHeightTmp+1;i++)
+    for (Int i=0;i<iCuHeightTmp+1;i++) //额外多记录一列
     {
-      m_pTmpL2[i] = pRec[iShift];
+      m_pTmpL2[i] = pRec[iShift]; //记录最后一列像素值
       pRec += iStride;
     }
-    pRec -= (iStride*(iCuHeightTmp+1));
+    pRec -= (iStride*(iCuHeightTmp+1)); // 回到最后一行最后一列
 
-    pTmpL = m_pTmpL1; 
-    pTmpU = &(m_pTmpU1[uiLPelX]); 
+    pTmpL = m_pTmpL1; //首列
+    pTmpU = &(m_pTmpU1[uiLPelX]);  // LCU首地址
   }
 
   pClipTbl = (iYCbCr==0)? m_pClipTable:m_pChromaClipTable;
@@ -1087,23 +1087,23 @@ Void TComSampleAdaptiveOffset::processSaoUnitAll(SaoLcuParam* saoLcuParam, Bool 
   Pel *pRec;
   Int picWidthTmp;
 
-  if (yCbCr == 0)
+  if (yCbCr == 0) //亮度
   {
     pRec        = m_pcPic->getPicYuvRec()->getLumaAddr();
     picWidthTmp = m_iPicWidth;
   } 
-  else if (yCbCr == 1)
+  else if (yCbCr == 1)//Cb
   {
     pRec        = m_pcPic->getPicYuvRec()->getCbAddr();
     picWidthTmp = m_iPicWidth>>1;
   }
-  else 
+  else //Cr
   {
     pRec        = m_pcPic->getPicYuvRec()->getCrAddr();
     picWidthTmp = m_iPicWidth>>1;
   }
 
-  memcpy(m_pTmpU1, pRec, sizeof(Pel)*picWidthTmp);
+  memcpy(m_pTmpU1, pRec, sizeof(Pel)*picWidthTmp); 
 
   Int  i;
   UInt edgeType;
@@ -1127,10 +1127,10 @@ Void TComSampleAdaptiveOffset::processSaoUnitAll(SaoLcuParam* saoLcuParam, Bool 
   pOffsetBo = (yCbCr==0) ? m_iOffsetBo : m_iChromaOffsetBo;
 
   offset[0] = 0;
-  for (idxY = 0; idxY< frameHeightInCU; idxY++)
+  for (idxY = 0; idxY< frameHeightInCU; idxY++) //一次一行LCU
   { 
-    addr = idxY * frameWidthInCU;
-    if (yCbCr == 0)
+    addr = idxY * frameWidthInCU; 
+    if (yCbCr == 0) //定位到行首的位置
     {
       pRec  = m_pcPic->getPicYuvRec()->getLumaAddr(addr);
       stride = m_pcPic->getStride();
@@ -1150,18 +1150,18 @@ Void TComSampleAdaptiveOffset::processSaoUnitAll(SaoLcuParam* saoLcuParam, Bool 
     }
 
     //     pRec += iStride*(m_uiMaxCUHeight-1);
-    for (i=0;i<(m_uiMaxCUHeight>>isChroma)+1;i++)
+    for (i=0;i<(m_uiMaxCUHeight>>isChroma)+1;i++) // LCU内部首列像素
     {
       m_pTmpL1[i] = pRec[0];
       pRec+=stride;
     }
-    pRec-=(stride<<1);
+    pRec-=(stride<<1); 
 
-    memcpy(m_pTmpU2, pRec, sizeof(Pel)*picWidthTmp);
+    memcpy(m_pTmpU2, pRec, sizeof(Pel)*picWidthTmp); // 复制LCU最后一行
 
-    for (idxX = 0; idxX < frameWidthInCU; idxX++)
+    for (idxX = 0; idxX < frameWidthInCU; idxX++) // 一行内，一个个LCU
     {
-      addr = idxY * frameWidthInCU + idxX;
+      addr = idxY * frameWidthInCU + idxX; //LCU 序号
 
       if (oneUnitFlag)
       {
@@ -1173,16 +1173,16 @@ Void TComSampleAdaptiveOffset::processSaoUnitAll(SaoLcuParam* saoLcuParam, Bool 
         typeIdx = saoLcuParam[addr].typeIdx;
         mergeLeftFlag = saoLcuParam[addr].mergeLeftFlag;
       }
-      if (typeIdx>=0)
+      if (typeIdx>=0) // 非-1，即有效type
       {
-        if (!mergeLeftFlag)
+        if (!mergeLeftFlag) 
         {
 
-          if (typeIdx == SAO_BO)
+          if (typeIdx == SAO_BO) //BO
           {
             for (i=0; i<SAO_MAX_BO_CLASSES+1;i++)
             {
-              offset[i] = 0;
+              offset[i] = 0; 
             }
             for (i=0; i<saoLcuParam[addr].length; i++)
             {
@@ -1199,7 +1199,7 @@ Void TComSampleAdaptiveOffset::processSaoUnitAll(SaoLcuParam* saoLcuParam, Bool 
             }
 
           }
-          if (typeIdx == SAO_EO_0 || typeIdx == SAO_EO_1 || typeIdx == SAO_EO_2 || typeIdx == SAO_EO_3)
+          if (typeIdx == SAO_EO_0 || typeIdx == SAO_EO_1 || typeIdx == SAO_EO_2 || typeIdx == SAO_EO_3) //EO
           {
             for (i=0;i<saoLcuParam[addr].length;i++)
             {

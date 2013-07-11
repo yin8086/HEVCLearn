@@ -1694,7 +1694,7 @@ Void TEncSampleAdaptiveOffset::SAOProcess(SAOParam *pcSaoParam, Double dLambda)
   if ( m_saoLcuBasedOptimization)
   {
 #if SAO_ENCODING_CHOICE
-    rdoSaoUnitAll(pcSaoParam, dLambdaLuma, dLambdaChroma, depth);
+    rdoSaoUnitAll(pcSaoParam, dLambdaLuma, dLambdaChroma, depth); //一个个LCU进行SAO并选择
 #else
     rdoSaoUnitAll(pcSaoParam, dLambdaLuma, dLambdaChroma);
 #endif
@@ -1715,7 +1715,7 @@ Void TEncSampleAdaptiveOffset::SAOProcess(SAOParam *pcSaoParam, Double dLambda)
       assignSaoUnitSyntax(pcSaoParam->saoLcuParam[0],  pcSaoParam->psSaoPart[0], pcSaoParam->oneUnitFlag[0], 0);
     }
   }
-  if (pcSaoParam->bSaoFlag[0])
+  if (pcSaoParam->bSaoFlag[0]) //进行亮度SAO
   {
     processSaoUnitAll( pcSaoParam->saoLcuParam[0], pcSaoParam->oneUnitFlag[0], 0);
   }
@@ -1976,9 +1976,9 @@ Void TEncSampleAdaptiveOffset::rdoSaoUnitAll(SAOParam *saoParam, Double lambda, 
 
        }
       }
-      saoComponentParamDist(allowMergeLeft, allowMergeUp, saoParam, addr, addrUp, addrLeft, 0,  lambda, &mergeSaoParam[0][0], &compDistortion[0]);
+      saoComponentParamDist(allowMergeLeft, allowMergeUp, saoParam, addr, addrUp, addrLeft, 0,  lambda, &mergeSaoParam[0][0], &compDistortion[0]); // 找出Y分量，色度分量最佳滤波模式
       sao2ChromaParamDist(allowMergeLeft, allowMergeUp, saoParam, addr, addrUp, addrLeft, lambdaChroma, &mergeSaoParam[1][0], &mergeSaoParam[2][0], &compDistortion[0]);
-     if( saoParam->bSaoFlag[0] || saoParam->bSaoFlag[1] )
+     if( saoParam->bSaoFlag[0] || saoParam->bSaoFlag[1] ) //亮度，色度均允许 SAO
       {
         // Cost of new SAO_params
         m_pcRDGoOnSbacCoder->load(m_pppcRDSbacCoder[0][CI_CURR_BEST]);
@@ -1991,7 +1991,7 @@ Void TEncSampleAdaptiveOffset::rdoSaoUnitAll(SAOParam *saoParam, Double lambda, 
         {
           m_pcEntropyCoder->m_pcEntropyCoderIf->codeSaoMerge(0);
         }
-        for ( compIdx=0;compIdx<3;compIdx++)
+        for ( compIdx=0;compIdx<3;compIdx++) //对每个分量编码SAO
         {
         if( (compIdx ==0 && saoParam->bSaoFlag[0]) || (compIdx >0 && saoParam->bSaoFlag[1]))
           {
@@ -2000,7 +2000,7 @@ Void TEncSampleAdaptiveOffset::rdoSaoUnitAll(SAOParam *saoParam, Double lambda, 
         }
 
         rate = m_pcEntropyCoder->getNumberOfWrittenBits();
-        bestCost = compDistortion[0] + (Double)rate;
+        bestCost = compDistortion[0] + (Double)rate; // Cost 累计
         m_pcRDGoOnSbacCoder->store(m_pppcRDSbacCoder[0][CI_TEMP_BEST]);
 
         // Cost of Merge
@@ -2039,11 +2039,11 @@ Void TEncSampleAdaptiveOffset::rdoSaoUnitAll(SAOParam *saoParam, Double lambda, 
         }
 #if SAO_ENCODING_CHOICE
 #if SAO_ENCODING_CHOICE_CHROMA
-if( saoParam->saoLcuParam[0][addr].typeIdx == -1)
+if( saoParam->saoLcuParam[0][addr].typeIdx == -1) //亮度不存在 SAO
 {
-  numNoSao[0]++;
+  numNoSao[0]++; //无SAO参数的个数
 }
-if( saoParam->saoLcuParam[1][addr].typeIdx == -1)
+if( saoParam->saoLcuParam[1][addr].typeIdx == -1) // 色度不存在 SAO
 {
   numNoSao[1]+=2;
 }
@@ -2064,15 +2064,15 @@ if( saoParam->saoLcuParam[1][addr].typeIdx == -1)
   }
 #if SAO_ENCODING_CHOICE
 #if SAO_ENCODING_CHOICE_CHROMA
-  if( !saoParam->bSaoFlag[0])
+  if( !saoParam->bSaoFlag[0]) //亮度不进行SAO，没有SAO占100%
   {
     m_depthSaoRate[0][depth] = 1.0;
   }
-  else
+  else //进行SAO的时候，计算没有SAO所占比例
   {
     m_depthSaoRate[0][depth] = numNoSao[0]/((Double) frameHeightInCU*frameWidthInCU);
   }
-  if( !saoParam->bSaoFlag[1]) 
+  if( !saoParam->bSaoFlag[1]) //同上，计算没有SAO的LCU所占比列
   {
     m_depthSaoRate[1][depth] = 1.0;
   }
@@ -2282,7 +2282,7 @@ Void TEncSampleAdaptiveOffset::saoComponentParamDist(Int allowMergeLeft, Int all
       bestDist = estDist;       
     }
   }
-  compDistortion[0] += ((Double)bestDist/lambda);
+  compDistortion[0] += ((Double)bestDist/lambda); //累加
   m_pcRDGoOnSbacCoder->load(m_pppcRDSbacCoder[0][CI_TEMP_BEST]);
  m_pcEntropyCoder->encodeSaoOffset(saoLcuParam, yCbCr);
   m_pcRDGoOnSbacCoder->store( m_pppcRDSbacCoder[0][CI_TEMP_BEST] );
